@@ -1,17 +1,23 @@
+
+close all
+clear all
+
 n_r = 16;
 n_t = 8;
 n_sc = 64;
-n_s = 64;
+n_s = 56;
 
-J = 10;
+J = 100;
 
-H = zeros(J,n_s,n_r,n_t,n_sc);
+H = zeros(J,n_s,n_sc,n_r,n_t,2);
 
 for i=1:J
-    H(i,:,:,:,:) = channel_generator(n_r,n_t,n_sc,n_s);
+    h = permute(channel_generator(n_r,n_t,n_sc,n_s), [1,4,2,3]);
+    H(i,:,:,:,:,1) = real(h);
+    H(i,:,:,:,:,2) = imag(h);
 end
 
-max_value = max(max(real(H), [], 'all'), max(imag(H), [], 'all'));
+max_value = max(H, [], 'all');
 power_ten = -1;
 while max_value<1
     power_ten = power_ten+1;
