@@ -39,8 +39,12 @@ class CsiDataloader:
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')
-        self.power_ten = int(np.array(files.get('power_ten'))[0][0])
+        if 'power_ten' in files.keys():
+            self.power_ten = int(np.array(files.get('power_ten'))[0][0])
+        else:
+            self.power_ten = 0
         data = CsiDataloader.real2complex(np.array(H).transpose())
+        files.close()
 
         self.J = data.shape[0]
         self.n_c = data.shape[1]
@@ -64,13 +68,10 @@ class CsiDataloader:
     def noise_snr_range(self, count: int, snr_range: list):
         snrs = np.random.randint(snr_range[0], snr_range[1], (count // self.n_c, 1))
         noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
-        noise_var = np.expand_dims(noise_var.repeat(self.n_c, 0), 1).repeat(self.n_sc, 1)
-        noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r]).reshape(count,
-                                                                                                        self.n_sc,
-                                                                                                        self.n_r, 1)
-        noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r]).reshape(count,
-                                                                                                        self.n_sc,
-                                                                                                        self.n_r, 1)
+        noise_var = np.expand_dims(noise_var.repeat(self.n_c, 0), 1).repeat(self.n_sc, 1).repeat(self.n_r, -1)
+        noise_var = noise_var.reshape(noise_var.shape+(1,))
+        noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, self.n_t])
+        noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, self.n_t])
         noise_mat = noise_real + 1j * noise_imag
         return noise_mat, noise_var
 
@@ -85,11 +86,32 @@ class CsiDataloader:
                                                   size=(count, self.n_sc, self.n_t, 1))
         return np.array(list(map(lambda x: CsiDataloader.constellations[modulation.lower()][x], constellation_idx_mat)))
 
+    def get_pilot_x(self, n_t=None):
+        if n_t is None:
+            n_t = self.n_t
+        if n_t & (n_t - 1) == 0:
+            np.zeros((n_t, n_t), dtype=complex)
+            x = np.array([[1 + 0j, 1 + 0j], [1j, -1j]]) * (np.sqrt(2) / 2)
+            i = 2
+            while i < n_t:
+                x = np.block([[x, x], [x, -x]]) * (np.sqrt(2) / 2)
+                i *= 2
+            return x
+        else:
+            raise Exception('n_t:{} not 2^n'.format(n_t))
+
     def get_h_x(self, dataType: DataType, modulation: str):
         if dataType is DataType.train:
             return self.train_H, self.train_X(modulation)
         elif dataType is DataType.test:
             return self.test_H, self.test_X(modulation)
+        raise Exception("can't support this type {}".format(dataType))
+
+    def get_h(self, dataType: DataType):
+        if dataType is DataType.train:
+            return self.train_H
+        elif dataType is DataType.test:
+            return self.test_H
         raise Exception("can't support this type {}".format(dataType))
 
 

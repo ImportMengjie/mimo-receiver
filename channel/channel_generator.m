@@ -28,7 +28,7 @@ function h = channel_generator(n_r, n_t, n_sc, n_s)
 
     l.rx_array = qd_arrayant.generate( '3gpp-3d',  1, n_r, s.center_frequency(1), 1);                       % Set omni-rx antenna
     c = l.get_channels;
-    h = zeros(n_s, n_r, n_t, n_sc);
+    h = zeros(fix(n_s), n_r, n_t, n_sc);
     for t_i = 1:n_s
         h(t_i,:,:,:) = reshape(c.fr(n_sc*sc_bw, n_sc, t_i), 1, n_r, n_t, n_sc);
     end
