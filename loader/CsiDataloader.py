@@ -70,9 +70,10 @@ class CsiDataloader:
         noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         noise_var = np.expand_dims(noise_var.repeat(self.n_c, 0), 1).repeat(self.n_sc, 1).repeat(self.n_r, -1)
         noise_var = noise_var.reshape(noise_var.shape+(1,))
-        noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, self.n_t])
-        noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, self.n_t])
+        noise_real = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t])
+        noise_imag = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t])
         noise_mat = noise_real + 1j * noise_imag
+        # noise_mat = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t, 2]).view(np.complex128)
         return noise_mat, noise_var
 
     def train_X(self, modulation):
