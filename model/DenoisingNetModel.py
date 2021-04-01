@@ -8,6 +8,7 @@ import numpy as np
 from loader import CsiDataloader
 from loader import DenoisingNetDataset
 from loader import DataType
+from model import Tee
 
 
 class NoiseLevelEstimationModel(nn.Module):
@@ -97,6 +98,11 @@ class DenoisingNetModel(nn.Module):
         h_hat = self.denosing(concat_x)
         return h_hat, sigma_map_hat
 
+    def __str__(self) -> str:
+        return '{}_r{}t{}_sigma{}denosing{}channel{}'.format(self.__class__.__name__, self.n_r, self.n_t,
+                                                             self.noise_level_conv_num, self.denosing_conv_num,
+                                                             self.channel_num)
+
 
 class DenoisingNetLoss(nn.Module):
 
@@ -108,8 +114,25 @@ class DenoisingNetLoss(nn.Module):
         l2_h_loss = F.mse_loss(h_hat, h)
         asym_loss = torch.mean(
             torch.abs(self.a - F.relu(sigma_map - sigma_map_hat)) * torch.pow(sigma_map - sigma_map_hat, 2))
-        loss = l2_h_loss + 0.5*asym_loss
+        loss = l2_h_loss + 0.5 * asym_loss
         return loss
+
+
+class DenoisingNetTee(Tee):
+
+    def __init__(self, items):
+        super().__init__(items)
+        self.h_ls, self.h, self.sigma_map = items
+        self.h_hat, self.sigma_map_hat = None, None
+
+    def get_model_input(self):
+        return self.h_ls,
+
+    def set_model_output(self, outputs):
+        self.h_hat, self.sigma_map_hat = outputs
+
+    def get_loss_input(self):
+        return self.h, self.h_hat, self.sigma_map, self.sigma_map_hat
 
 
 if __name__ == '__main__':
@@ -123,9 +146,10 @@ if __name__ == '__main__':
 
     model.train()
     model.double()
-    for (h, sigma_map, h_ls) in dataloader:
-        h_hat, sigma_map_hat = model(h_ls)
-        loss = criterion(h, h_hat, sigma_map, sigma_map_hat)
+    for items in dataloader:
+        tee = DenoisingNetTee(items)
+        tee.set_model_output(model(*tee.get_model_input()))
+        loss = criterion(*tee.get_loss_input())
         print(loss)
         optimizer.zero_grad()
         loss.backward()
