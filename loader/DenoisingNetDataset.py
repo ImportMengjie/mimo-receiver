@@ -1,15 +1,11 @@
-import numpy as np
 import torch
+
+from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-from loader import BaseDataset
 
 
 class DenoisingNetDataset(BaseDataset):
-
-    @staticmethod
-    def complex2real(mat: torch.Tensor):
-        return torch.cat((mat.real.reshape(mat.shape + (1,)), mat.imag.reshape(mat.shape + (1,))), len(mat.shape))
 
     def __init__(self, csiDataloader: CsiDataloader, datatype: DataType, snr_range: list):
         super().__init__(csiDataloader, datatype, snr_range)

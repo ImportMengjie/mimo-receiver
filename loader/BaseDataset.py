@@ -2,11 +2,16 @@ from abc import ABC
 
 import numpy as np
 import torch.utils.data
+
 from loader import CsiDataloader
 from loader import DataType
 
 
 class BaseDataset(torch.utils.data.Dataset, ABC):
+
+    @staticmethod
+    def complex2real(mat: torch.Tensor):
+        return torch.cat((mat.real.reshape(mat.shape + (1,)), mat.imag.reshape(mat.shape + (1,))), len(mat.shape))
 
     def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list) -> None:
         super(BaseDataset, self).__init__()

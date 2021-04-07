@@ -1,18 +1,18 @@
+import logging
 import os
 from dataclasses import dataclass
-import logging
 
 import torch
-from torch.utils.data import DataLoader
 from torch.nn import Module
+from torch.utils.data import DataLoader
 
 from loader import CsiDataloader
-from loader import DenoisingNetDataset
 from loader import DataType
-from model import Tee
-from model import DenoisingNetModel
+from loader import DenoisingNetDataset
 from model import DenoisingNetLoss
+from model import DenoisingNetModel
 from model import DenoisingNetTee
+from model import Tee
 from utils import AvgLoss
 
 

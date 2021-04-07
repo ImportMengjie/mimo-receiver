@@ -69,9 +69,9 @@ class CsiDataloader:
         snrs = np.random.randint(snr_range[0], snr_range[1], (count // self.n_c, 1))
         noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         noise_var = np.expand_dims(noise_var.repeat(self.n_c, 0), 1).repeat(self.n_sc, 1).repeat(self.n_r, -1)
-        noise_var = noise_var.reshape(noise_var.shape+(1,))
-        noise_real = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t])
-        noise_imag = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t])
+        noise_var = noise_var.reshape(noise_var.shape + (1,))
+        noise_real = np.random.normal(0, np.sqrt(noise_var) / 4., [count, self.n_sc, self.n_r, self.n_t])
+        noise_imag = np.random.normal(0, np.sqrt(noise_var) / 4., [count, self.n_sc, self.n_r, self.n_t])
         noise_mat = noise_real + 1j * noise_imag
         # noise_mat = np.random.normal(0, np.sqrt(noise_var)/4., [count, self.n_sc, self.n_r, self.n_t, 2]).view(np.complex128)
         return noise_mat, noise_var
@@ -113,6 +113,13 @@ class CsiDataloader:
             return self.train_H
         elif dataType is DataType.test:
             return self.test_H
+        raise Exception("can't support this type {}".format(dataType))
+
+    def get_x(self, dataType: DataType, modulation: str):
+        if dataType is DataType.train:
+            return self.train_X(modulation)
+        elif dataType is DataType.test:
+            return self.train_X(modulation)
         raise Exception("can't support this type {}".format(dataType))
 
 
