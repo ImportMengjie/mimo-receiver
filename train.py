@@ -9,9 +9,14 @@ from torch.utils.data import DataLoader
 from loader import CsiDataloader
 from loader import DataType
 from loader import DenoisingNetDataset
+from loader import InterpolationNetDataset
 from model import DenoisingNetLoss
 from model import DenoisingNetModel
 from model import DenoisingNetTee
+
+from model import InterpolationNetModel
+from model import InterpolationNetLoss
+from model import InterpolationNetTee
 from model import Tee
 from utils import AvgLoss
 
@@ -82,11 +87,17 @@ if __name__ == '__main__':
 
     csiDataloader = CsiDataloader('data/h_16_16_64_1.mat')
     dataset = DenoisingNetDataset(csiDataloader, DataType.train, [50, 51])
-    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
 
     model = DenoisingNetModel(csiDataloader.n_r, csiDataloader.n_t)
     criterion = DenoisingNetLoss()
     param = TrainParam()
 
-    train = Train(param, dataloader, model, criterion, DenoisingNetTee)
+    dataset = InterpolationNetDataset(csiDataloader, DataType.train, [50,51], 4)
+
+    model = InterpolationNetModel(csiDataloader.n_r, csiDataloader.n_t)
+    criterion = InterpolationNetLoss()
+
+    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
+    # train = Train(param, dataloader, model, criterion, DenoisingNetTee)
+    train = Train(param, dataloader, model, criterion, InterpolationNetTee)
     train.train()
