@@ -5,3 +5,6 @@ from model.DenoisingNetModel import DenoisingNetTee
 from model.InterpolationNetModel import InterpolationNetModel
 from model.InterpolationNetModel import InterpolationNetLoss
 from model.InterpolationNetModel import InterpolationNetTee
+from model.DetectionNetModel import DetectionNetModel
+from model.DetectionNetModel import DetectionNetLoss
+from model.DetectionNetModel import DetectionNetTee

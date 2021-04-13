@@ -3,3 +3,4 @@ from loader.CsiDataloader import CsiDataloader
 from loader.BaseDataset import BaseDataset
 from loader.DenoisingNetDataset import DenoisingNetDataset
 from loader.InterpolationNetDataset import InterpolationNetDataset
+from loader.DetectionNetDataset import DetectionNetDataset

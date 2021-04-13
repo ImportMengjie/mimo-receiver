@@ -10,6 +10,8 @@ from loader import CsiDataloader
 from loader import DataType
 from loader import DenoisingNetDataset
 from loader import InterpolationNetDataset
+from loader import DetectionNetDataset
+
 from model import DenoisingNetLoss
 from model import DenoisingNetModel
 from model import DenoisingNetTee
@@ -17,8 +19,13 @@ from model import DenoisingNetTee
 from model import InterpolationNetModel
 from model import InterpolationNetLoss
 from model import InterpolationNetTee
-from model import Tee
+
+from model import DetectionNetModel
+from model import DetectionNetLoss
+from model import DetectionNetTee
+
 from utils import AvgLoss
+from model import Tee
 
 
 @dataclass()
@@ -42,12 +49,12 @@ class Train:
 
     def train(self, save=True, reload=True):
         self.losses.clear()
-        save_path = os.path.join(Train.save_dir, '{}.pth.tar'.format(str(model)))
+        save_path = os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model)))
         current_epoch = 0
         if reload and os.path.exists(save_path):
             model_info = torch.load(save_path)
-            model.load_state_dict(model_info['state_dict'])
-            optimizer = torch.optim.Adam(model.parameters())
+            self.model.load_state_dict(model_info['state_dict'])
+            optimizer = torch.optim.Adam(self.model.parameters())
             optimizer.load_state_dict(model_info['optimizer'])
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
             scheduler.load_state_dict(model_info['scheduler'])
@@ -76,28 +83,55 @@ class Train:
                 # save model
                 torch.save({
                     'epoch': epoch + 1,
-                    'state_dict': model.state_dict(),
+                    'state_dict': self.model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'scheduler': scheduler.state_dict()
-                }, os.path.join(Train.save_dir, '{}.pth.tar'.format(str(model))))
+                }, os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model))))
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-
-    csiDataloader = CsiDataloader('data/h_16_16_64_1.mat')
-    dataset = DenoisingNetDataset(csiDataloader, DataType.train, [50, 51])
+def train_denoising_net(data_path: str, snr_range: list, ):
+    csiDataloader = CsiDataloader(data_path)
+    dataset = DenoisingNetDataset(csiDataloader, DataType.train, snr_range)
+    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
 
     model = DenoisingNetModel(csiDataloader.n_r, csiDataloader.n_t)
     criterion = DenoisingNetLoss()
     param = TrainParam()
 
-    dataset = InterpolationNetDataset(csiDataloader, DataType.train, [50,51], 4)
+    train = Train(param, dataloader, model, criterion, DenoisingNetTee)
+    train.train()
+
+
+def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
+    csiDataloader = CsiDataloader(data_path)
+    dataset = InterpolationNetDataset(csiDataloader, DataType.train, snr_range, pilot_count)
+    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
 
     model = InterpolationNetModel(csiDataloader.n_r, csiDataloader.n_t)
     criterion = InterpolationNetLoss()
+    param = TrainParam()
 
-    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
-    # train = Train(param, dataloader, model, criterion, DenoisingNetTee)
     train = Train(param, dataloader, model, criterion, InterpolationNetTee)
     train.train()
+
+
+def train_detection_net(data_path: str, snr_range: list, modulation='qpsk'):
+    csiDataloader = CsiDataloader(data_path)
+    dataset = DetectionNetDataset(csiDataloader, DataType.train, snr_range, modulation)
+    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
+
+    model = DetectionNetModel(csiDataloader.n_r, csiDataloader.n_t, 10, True, modulation=modulation)
+    criterion = DetectionNetLoss()
+    param = TrainParam()
+    param.epochs = 1000
+
+    train = Train(param, dataloader, model, criterion, DetectionNetTee)
+    train.train()
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
+
+    # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
+    # train_interpolation_net('data/h_16_16_64_1.mat', [50,51], 4)
+    train_detection_net('data/h_16_16_64_1.mat', [50, 51])
