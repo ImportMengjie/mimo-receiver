@@ -9,6 +9,18 @@ from loader import DenoisingNetDataset
 from model import Tee
 
 
+class ConvBnReluBlock(nn.Module):
+
+    def __init__(self, in_channel: int, out_channel: int, kernel_size, padding):
+        super(ConvBnReluBlock, self).__init__()
+        self.conv = nn.Conv2d(in_channel, out_channel, kernel_size, padding=padding)
+        self.bn = nn.BatchNorm2d(out_channel)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.relu(self.bn(self.conv(x)))
+
+
 class NoiseLevelEstimationModel(nn.Module):
 
     def __init__(self, n_r, n_t, conv_num=5, channel_num=32, kernel_size=(3, 3)):
@@ -23,11 +35,8 @@ class NoiseLevelEstimationModel(nn.Module):
             nn.Conv2d(2, self.channel_num, kernel_size, padding=padding),
             nn.ReLU(inplace=True)
         )
-        self.conv_bn = nn.Sequential(
-            nn.Conv2d(self.channel_num, self.channel_num, kernel_size, padding=padding),
-            nn.BatchNorm2d(self.channel_num),
-            nn.ReLU(inplace=True)
-        )
+        self.conv_bns = [ConvBnReluBlock(channel_num, channel_num, kernel_size, padding) for _ in range(conv_num)]
+        self.conv_bns = nn.Sequential(*self.conv_bns)
 
         self.fc = nn.Sequential(
             nn.Linear(n_t, 2000),
@@ -41,8 +50,7 @@ class NoiseLevelEstimationModel(nn.Module):
 
     def forward(self, x):
         x = self.first_conv(x)
-        for _ in range(0, self.conv_num):
-            x = self.conv_bn(x)
+        x = self.conv_bns(x)
         out = self.back_conv(x)
         return out
 
@@ -61,17 +69,13 @@ class NonBlindDenosingModel(nn.Module):
             nn.Conv2d(3, self.channel_num, kernel_size, padding=padding),
             nn.ReLU(inplace=True)
         )
-        self.conv_bn = nn.Sequential(
-            nn.Conv2d(self.channel_num, self.channel_num, kernel_size, padding=padding),
-            nn.BatchNorm2d(self.channel_num),
-            nn.ReLU(inplace=True)
-        )
+        self.conv_bns = [ConvBnReluBlock(channel_num, channel_num, kernel_size, padding) for _ in range(conv_num)]
+        self.conv_bns = nn.Sequential(*self.conv_bns)
         self.back_conv = nn.Conv2d(self.channel_num, 2, kernel_size, padding=padding)
 
     def forward(self, x):
         x = self.first_conv(x)
-        for _ in range(0, self.conv_num):
-            x = self.conv_bn(x)
+        x = self.conv_bns(x)
         out = self.back_conv(x)
         return out
 

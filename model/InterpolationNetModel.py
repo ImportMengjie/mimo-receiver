@@ -29,14 +29,14 @@ class InterpolationNetModel(nn.Module):
         padding = ((kernel_size[0] - 1) // 2, (kernel_size[0] - 1) // 2)
 
         self.first_conv = nn.Conv2d(2, channel_num, kernel_size=kernel_size, padding=padding)
-        self.block = ConvReluBlock(64, 64, kernel_size, padding)
+        blocks = [ConvReluBlock(channel_num, channel_num, kernel_size, padding) for _ in range(num_conv_block)]
+        self.blocks = nn.Sequential(*blocks)
         self.back_conv = nn.Conv2d(channel_num, 2, kernel_size, padding=padding)
 
     def forward(self, x):
         residual = x
         x = self.first_conv(x)
-        for _ in range(0, self.num_conv_block):
-            x = self.block(x)
+        x = self.blocks(x)
         x = self.back_conv(x)
         out = torch.add(x, residual)
         return out,

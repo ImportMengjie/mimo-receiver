@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
+from torchsummary import summary
 
 from loader import CsiDataloader
 from loader import DataType
@@ -30,8 +31,9 @@ from model import Tee
 
 @dataclass()
 class TrainParam:
-    lr: int = 0.0000001
+    lr: float = 0.0000001
     epochs: int = 100
+    momentum: float = 0.9
 
 
 class Train:
@@ -51,19 +53,20 @@ class Train:
         self.losses.clear()
         save_path = os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model)))
         current_epoch = 0
+
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.param.lr)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
         if reload and os.path.exists(save_path):
             model_info = torch.load(save_path)
             self.model.load_state_dict(model_info['state_dict'])
-            optimizer = torch.optim.Adam(self.model.parameters())
             optimizer.load_state_dict(model_info['optimizer'])
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
             scheduler.load_state_dict(model_info['scheduler'])
             current_epoch = model_info['epoch']
-        else:
-            optimizer = torch.optim.Adam(self.model.parameters(), lr=self.param.lr)
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
+
         self.model.train()
         self.model.double()
+        logging.info('model:')
+        summary(self.model)
         for epoch in range(current_epoch, self.param.epochs):
             avg_loss = AvgLoss()
             for items in self.dataloader:
@@ -133,5 +136,5 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
-    # train_interpolation_net('data/h_16_16_64_1.mat', [50,51], 4)
+    # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     train_detection_net('data/h_16_16_64_1.mat', [50, 51])

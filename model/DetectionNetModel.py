@@ -41,14 +41,15 @@ class DetectionNetModel(nn.Module):
         self.vector = vector
         self.modulation = modulation
         self.layer_nums = layer_nums
-        self.lcg_layer = Lcg(n_t, vector)
+        self.lcg_layers = [Lcg(n_t, vector) for _ in range(self.layer_nums)]
+        self.lcg_layers = nn.ModuleList(self.lcg_layers)
 
     def forward(self, A, b):
         s = torch.zeros(b.shape)
         r = b
         d = r
-        for _ in range(self.layer_nums):
-            s, r, d = self.lcg_layer(s, r, d, A)
+        for i in range(len(self.lcg_layers)):
+            s, r, d = self.lcg_layers[i](s, r, d, A)
         return s,
 
     def __str__(self):
