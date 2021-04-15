@@ -34,21 +34,35 @@ class Lcg(nn.Module):
 
 class DetectionNetModel(nn.Module):
 
-    def __init__(self, n_r, n_t, layer_nums: int, vector=True, modulation='qpsk'):
+    def __init__(self, n_r, n_t, layer_nums: int, vector=True, modulation='qpsk', is_training=True):
         super().__init__()
         self.n_r = n_r
         self.n_t = n_t
         self.vector = vector
         self.modulation = modulation
         self.layer_nums = layer_nums
+        self.training_layer = layer_nums
+        self.is_training = is_training
         self.lcg_layers = [Lcg(n_t, vector) for _ in range(self.layer_nums)]
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
+
+    def set_training_layer(self, training_layer: int, fix_forward_layer=True):
+        assert self.is_training
+        assert training_layer <= self.layer_nums
+        self.training_layer = training_layer
+        for i in range(self.training_layer-1):
+            for p in self.lcg_layers[i].parameters():
+                p.requires_grad = not fix_forward_layer
+
+    def reset_requires_grad(self):
+        for p in self.parameters():
+            p.requires_grad = True
 
     def forward(self, A, b):
         s = torch.zeros(b.shape)
         r = b
         d = r
-        for i in range(len(self.lcg_layers)):
+        for i in range(self.training_layer):
             s, r, d = self.lcg_layers[i](s, r, d, A)
         return s,
 

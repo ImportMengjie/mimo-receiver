@@ -54,7 +54,7 @@ class Train:
         save_path = os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model)))
         current_epoch = 0
 
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.param.lr)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
         if reload and os.path.exists(save_path):
             model_info = torch.load(save_path)
@@ -118,18 +118,28 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     train.train()
 
 
-def train_detection_net(data_path: str, snr_range: list, modulation='qpsk'):
+def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
     csiDataloader = CsiDataloader(data_path)
-    dataset = DetectionNetDataset(csiDataloader, DataType.train, snr_range, modulation)
-    dataloader = torch.utils.data.DataLoader(dataset, 10, True)
-
     model = DetectionNetModel(csiDataloader.n_r, csiDataloader.n_t, 10, True, modulation=modulation)
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.epochs = 1000
+    param.epochs = 100
+    training_snr = sorted(training_snr, reverse=True)
 
-    train = Train(param, dataloader, model, criterion, DetectionNetTee)
-    train.train()
+    def train_fixed_snr(snr_: int):
+        dataset = DetectionNetDataset(csiDataloader, DataType.train, [snr_, snr_ + 1], modulation)
+        dataloader = torch.utils.data.DataLoader(dataset, 10, True)
+        train = Train(param, dataloader, model, criterion, DetectionNetTee)
+        for layer_num in range(1, model.layer_nums+1):
+            logging.info('training layer:{}'.format(layer_num))
+            model.set_training_layer(layer_num, True)
+            train.train(reload=False)
+            logging.info('Fine tune layer:{}'.format(layer_num))
+            model.set_training_layer(layer_num, False)
+            train.train(reload=False)
+
+    for snr in training_snr:
+        train_fixed_snr(snr)
 
 
 if __name__ == '__main__':
@@ -137,4 +147,4 @@ if __name__ == '__main__':
 
     # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
-    train_detection_net('data/h_16_16_64_1.mat', [50, 51])
+    train_detection_net('data/h_16_16_64_1.mat', [170, 160])

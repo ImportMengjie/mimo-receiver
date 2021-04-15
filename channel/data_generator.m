@@ -2,12 +2,12 @@
 close all
 clear all
 
-n_r = 64;
-n_t = 64;
+n_r = 16;
+n_t = 16;
 n_sc = 64;
 n_s = 1.5;
 
-J = 100;
+J = 10000;
 
 H = zeros(J,fix(n_s),n_sc,n_r,n_t,2);
 

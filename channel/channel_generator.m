@@ -22,7 +22,7 @@ function h = channel_generator(n_r, n_t, n_sc, n_s)
     l = qd_layout( s );
     l.rx_track = t;
         
-    l.tx_position = [0 0 0]';
+    l.tx_position = [0 0 20]';
 
     l.tx_array = qd_arrayant.generate( '3gpp-3d',  1, n_t, s.center_frequency(1), 1);                        
 
