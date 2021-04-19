@@ -4,6 +4,8 @@ from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
 
+from utils import complex2real
+
 
 class DenoisingNetDataset(BaseDataset):
 
@@ -19,9 +21,9 @@ class DenoisingNetDataset(BaseDataset):
     def __getitem__(self, item):
         n_sc_idx = item % self.csiDataloader.n_sc
         idx = item // self.csiDataloader.n_sc
-        h = DenoisingNetDataset.complex2real(self.h[idx, n_sc_idx])
+        h = complex2real(self.h[idx, n_sc_idx])
         h = h.permute(2, 0, 1)
-        h_ls = DenoisingNetDataset.complex2real(self.h_ls[idx, n_sc_idx])
+        h_ls = complex2real(self.h_ls[idx, n_sc_idx])
         h_ls = h_ls.permute(2, 0, 1)
         sigma_map = torch.full((2, self.csiDataloader.n_r, self.csiDataloader.n_t), self.sigma[idx, n_sc_idx, 0, 0])
         return h_ls, h, sigma_map
@@ -35,10 +37,10 @@ if __name__ == '__main__':
     snrs = [i for i in range(100, 201, 1)]
     for snr in snrs:
         denoising = DenoisingNetDataset(csiDataloader, DataType.train, [snr, snr + 1])
-        h = DenoisingNetDataset.complex2real(denoising.h)
+        h = complex2real(denoising.h)
         h_hat = DenoisingNetDataset.complex2real(denoising.h_ls)
 
-        nmse = (torch.sqrt((h_hat - h) ** 2) / torch.sqrt(h ** 2)).mean()
+        nmse = (((h_hat - h) ** 2) / (h ** 2)).mean()
         nmse = 10 * torch.log10(nmse)
         # nmse2 = (((h_hat2 - h)**2)/(h**2)).mean()
         # nmse = (((h_hat - h)**2)/(h**2)).mean()

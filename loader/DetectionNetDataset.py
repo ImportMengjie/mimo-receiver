@@ -9,7 +9,7 @@ class DetectionNetDataset(BaseDataset):
 
     def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list, modulation='qpsk') -> None:
         super().__init__(csiDataloader, dataType, snr_range)
-        self.n = self.n[:, :, :, 0:1]
+        # self.n = self.n[:, :, :, 0:1]
         self.x = torch.from_numpy(csiDataloader.get_x(dataType, modulation))
         self.y = self.h @ self.x + self.n
         self.A = self.h.conj().transpose(-1, -2) @ self.h + self.sigma * torch.eye(csiDataloader.n_t, csiDataloader.n_t)
@@ -35,6 +35,6 @@ class DetectionNetDataset(BaseDataset):
 
 if __name__ == '__main__':
     csiDataloader = CsiDataloader('../data/h_16_16_64_1.mat')
-    dataset = DetectionNetDataset(csiDataloader, DataType.train, [100, 101])
+    dataset = DetectionNetDataset(csiDataloader, DataType.train, [10, 101])
     A, b, x = dataset.__getitem__(1)
     print(A.shape, b.shape, x.shape)

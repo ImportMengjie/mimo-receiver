@@ -5,9 +5,9 @@ clear all
 n_r = 16;
 n_t = 16;
 n_sc = 64;
-n_s = 1.5;
+n_s = 1.9;
 
-J = 10000;
+J = 100;
 
 H = zeros(J,fix(n_s),n_sc,n_r,n_t,2);
 
