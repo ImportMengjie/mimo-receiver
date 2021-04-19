@@ -34,6 +34,7 @@ class TrainParam:
     lr: float = 0.0000001
     epochs: int = 100
     momentum: float = 0.9
+    only_loss_not_down_stop: bool = True
 
 
 class Train:
@@ -67,7 +68,8 @@ class Train:
         self.model.double()
         logging.info('model:')
         summary(self.model)
-        for epoch in range(current_epoch, self.param.epochs):
+        loss_down = self.param.only_loss_not_down_stop
+        while current_epoch < self.param.epochs or loss_down:
             avg_loss = AvgLoss()
             for items in self.dataloader:
                 tee = self.teeClass(items)
@@ -78,18 +80,20 @@ class Train:
                 loss.backward()
                 optimizer.step()
             self.losses.append(avg_loss.avg)
+            if len(self.losses) > self.param.epochs and self.losses[-1] > self.losses[-2]:
+                loss_down = False
             avg_loss.reset()
-            logging.info('epoch:{} avg_loss:{}'.format(epoch, self.losses[-1]))
+            logging.info('epoch:{} avg_loss:{}'.format(current_epoch, self.losses[-1]))
             scheduler.step()
-
-            if save and (epoch % Train.save_per_epoch == 0 or epoch + 1 == self.param.epochs):
+            if save and (current_epoch % Train.save_per_epoch == 0 or current_epoch + 1 == self.param.epochs):
                 # save model
                 torch.save({
-                    'epoch': epoch + 1,
+                    'epoch': current_epoch + 1,
                     'state_dict': self.model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'scheduler': scheduler.state_dict()
                 }, os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model))))
+            current_epoch += 1
 
 
 def train_denoising_net(data_path: str, snr_range: list, ):
@@ -100,6 +104,8 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     criterion = DenoisingNetLoss()
     param = TrainParam()
+    param.only_loss_not_down_stop = False
+    param.epochs = 10
 
     train = Train(param, dataloader, model, criterion, DenoisingNetTee)
     train.train()
@@ -123,14 +129,14 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 10, True, modulation=modulation)
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.epochs = 100
+    param.epochs = 1000
     training_snr = sorted(training_snr, reverse=True)
 
     def train_fixed_snr(snr_: int):
         dataset = DetectionNetDataset(csi_dataloader, DataType.train, [snr_, snr_ + 1], modulation)
         dataloader = torch.utils.data.DataLoader(dataset, 10, True)
         train = Train(param, dataloader, model, criterion, DetectionNetTee)
-        for layer_num in range(1, model.layer_nums+1):
+        for layer_num in range(1, model.layer_nums + 1):
             logging.info('training layer:{}'.format(layer_num))
             model.set_training_layer(layer_num, True)
             train.train(reload=False)
@@ -145,6 +151,6 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
+    train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
-    train_detection_net('data/h_16_16_64_1.mat', [170, 160])
+    # train_detection_net('data/h_16_16_64_1.mat', [200, 150, 100, 50, 20])

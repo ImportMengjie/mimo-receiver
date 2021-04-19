@@ -6,9 +6,9 @@ from loader import CsiDataloader, DataType
 from model import DetectionNetModel
 from train import Train
 from utils import DetectionMethod
-from utils import DetectionZeroForce
-from utils import DetectionMMSE
-from utils import DetectionModel
+from utils import DetectionMethodZF
+from utils import DetectionMethodMMSE
+from utils import DetectionMethodModel
 from utils import draw_line
 
 
@@ -21,7 +21,7 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
         n, var = csi_dataloader.noise_snr_range(h.shape[0], [snr, snr + 1], one_col=True)
         n = torch.from_numpy(n)
         var = torch.from_numpy(var)
-        y = h@x+n
+        y = h @ x + n
 
         for i in range(0, len(detection_method_list)):
             nmse = detection_method_list[i].get_nmse(y, h, x, var)
@@ -35,12 +35,12 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 if __name__ == '__main__':
     csi_dataloader = CsiDataloader('data/h_16_16_64_1.mat')
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 10, True, modulation='qpsk')
-    save_model_path = os.path.join(Train.save_dir, model.__str__()+".pth.tar")
+    save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     model_info = torch.load(save_model_path)
     model.load_state_dict(model_info['state_dict'])
-    # detection_methods = [DetectionZeroForce('qpsk'), DetectionMMSE('qpsk'), DetectionModel(model, 'qpsk')]
+    detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMMSE('qpsk')]
-    detection_methods = [DetectionMMSE('qpsk'), DetectionModel(model, 'qpsk')]
+    # detection_methods = [DetectionMMSE('qpsk'), DetectionModel(model, 'qpsk')]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 20, 200)
-    draw_line(x, nmse_dict)
+    draw_line(x, nmse_dict, lambda n: n <= 100)

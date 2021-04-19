@@ -1,5 +1,6 @@
 import torch
 
+
 class AvgLoss:
 
     def __init__(self):
@@ -18,3 +19,7 @@ class AvgLoss:
 
 def complex2real(mat: torch.Tensor):
     return torch.cat((mat.real.reshape(mat.shape + (1,)), mat.imag.reshape(mat.shape + (1,))), len(mat.shape))
+
+
+def conj_t(mat: torch.Tensor):
+    return mat.conj().transpose(-1, -2)

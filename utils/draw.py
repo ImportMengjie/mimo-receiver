@@ -1,10 +1,13 @@
 import matplotlib.pyplot as plt
 
+plt.rcParams['axes.unicode_minus'] = False
 
-def draw_line(x, y_dict:dict):
-    plt.rcParams['font.sans-serif'] = ['SimHei']  # 用来正常显示中文标签
-    plt.rcParams['axes.unicode_minus'] = False  # 用来正常显示负号
+
+def draw_line(x, y_dict: dict, filter_func=None):
+    if filter_func is None:
+        filter_func = lambda n: True
     for name, y in y_dict.items():
+        y = list(map(lambda n: n if filter_func(n) else None, y))
         plt.plot(x, y, label=name)
     plt.legend()
     plt.show()

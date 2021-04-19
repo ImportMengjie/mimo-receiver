@@ -15,11 +15,11 @@ class DetectionMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_x_hat(self, y, h, x, sigma):
+    def get_x_hat(self, y, h, x, var):
         pass
 
-    def get_nmse(self, y, h, x, sigma):
-        x_hat = self.get_x_hat(y, h, x, sigma)
+    def get_nmse(self, y, h, x, var):
+        x_hat = self.get_x_hat(y, h, x, var)
         x = complex2real(x)
         x_hat = complex2real(x_hat)
 
@@ -31,7 +31,7 @@ class DetectionMethod(abc.ABC):
         pass
 
 
-class DetectionZeroForce(DetectionMethod):
+class DetectionMethodZF(DetectionMethod):
 
     def __init__(self, constellation):
         super().__init__(constellation)
@@ -39,12 +39,12 @@ class DetectionZeroForce(DetectionMethod):
     def get_key_name(self):
         return 'ZF'
 
-    def get_x_hat(self, y, h, x, sigma):
+    def get_x_hat(self, y, h, x, var):
         x_hat = torch.linalg.inv(h.conj().transpose(-1, -2) @ h) @ h.conj().transpose(-1, -2) @ y
         return x_hat
 
 
-class DetectionMMSE(DetectionMethod):
+class DetectionMethodMMSE(DetectionMethod):
 
     def __init__(self, constellation):
         super().__init__(constellation)
@@ -52,13 +52,13 @@ class DetectionMMSE(DetectionMethod):
     def get_key_name(self):
         return 'mmse'
 
-    def get_x_hat(self, y, h, x, sigma):
-        A = h.conj().transpose(-1, -2) @ h + sigma * torch.eye(h.shape[-1], h.shape[-1])
+    def get_x_hat(self, y, h, x, var):
+        A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
         x_hat = torch.linalg.inv(A) @ h.conj().transpose(-1, -2) @ y
         return x_hat
 
 
-class DetectionModel(DetectionMethod):
+class DetectionMethodModel(DetectionMethod):
 
     def __init__(self, model: DetectionNetModel, constellation):
         self.model = model
@@ -68,8 +68,8 @@ class DetectionModel(DetectionMethod):
     def get_key_name(self):
         return self.model.__str__()
 
-    def get_x_hat(self, y, h, x, sigma):
-        A = h.conj().transpose(-1, -2) @ h + sigma * torch.eye(h.shape[-1], h.shape[-1])
+    def get_x_hat(self, y, h, x, var):
+        A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
         b = h.conj().transpose(-1, -2) @ y
 
         b = torch.cat((b.real, b.imag), 2)

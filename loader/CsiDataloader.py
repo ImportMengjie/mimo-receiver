@@ -72,8 +72,8 @@ class CsiDataloader:
         # noise_var = noise_var.reshape(noise_var.shape + (1,))
         noise_var = noise_var.reshape(noise_var.shape + (1, 1))
         n_t = 1 if one_col else self.n_t
-        noise_real = np.random.normal(0, np.sqrt(noise_var) / 4., [count, self.n_sc, self.n_r, n_t])
-        noise_imag = np.random.normal(0, np.sqrt(noise_var) / 4., [count, self.n_sc, self.n_r, n_t])
+        noise_real = np.random.normal(0, np.sqrt(noise_var) / 2., [count, self.n_sc, self.n_r, n_t])
+        noise_imag = np.random.normal(0, np.sqrt(noise_var) / 2., [count, self.n_sc, self.n_r, n_t])
         noise_mat = noise_real + 1j * noise_imag
         return noise_mat, noise_var
 
