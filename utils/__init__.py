@@ -1,6 +1,8 @@
 from utils.common import AvgLoss
 from utils.common import complex2real
 from utils.common import conj_t
+from utils.common import line_interpolation_hp_pilot
+from utils.common import get_interpolation_pilot_idx
 
 from utils.draw import draw_line
 
@@ -13,3 +15,7 @@ from utils.DenoisingMethod import DenoisingMethod
 from utils.DenoisingMethod import DenoisingMethodLS
 from utils.DenoisingMethod import DenoisingMethodMMSE
 from utils.DenoisingMethod import DenoisingMethodModel
+
+from utils.InterpolationMethod import InterpolationMethod
+from utils.InterpolationMethod import InterpolationMethodLine
+from utils.InterpolationMethod import InterpolationMethodModel

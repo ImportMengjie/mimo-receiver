@@ -45,7 +45,7 @@ class DenoisingMethodMMSE(DenoisingMethod):
         r_h = conj_t(h) @ h
         n_r = y.shape[-2]
         n_t = x.shape[-2]
-        h_hat = y @ torch.linalg.inv(conj_t(x) @ r_h @ x + n_r *var * torch.eye(n_t, n_t)) @ conj_t(
+        h_hat = y @ torch.linalg.inv(conj_t(x) @ r_h @ x + n_r * var * torch.eye(n_t, n_t)) @ conj_t(
             x) @ r_h
         return h_hat
 
@@ -63,7 +63,7 @@ class DenoisingMethodModel(DenoisingMethod):
     def get_h_hat(self, y, h, x, var):
         h_ls = y @ torch.linalg.inv(x)
         h_ls = complex2real(h_ls)
-        h_ls = h_ls.reshape((-1,)+h_ls.shape[2:])
+        h_ls = h_ls.reshape((-1,) + h_ls.shape[2:])
         h_ls = h_ls.permute(0, 3, 1, 2)
         h_hat, _ = self.model(h_ls)
         h_hat = h_hat.permute(0, 2, 3, 1)

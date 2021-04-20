@@ -116,7 +116,7 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     dataset = InterpolationNetDataset(csi_dataloader, DataType.train, snr_range, pilot_count)
     dataloader = torch.utils.data.DataLoader(dataset, 10, True)
 
-    model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
+    model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_sc, pilot_count)
     criterion = InterpolationNetLoss()
     param = TrainParam()
 
@@ -151,6 +151,6 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
-    # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
+    # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
+    train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/h_16_16_64_1.mat', [200, 150, 100, 50, 20])

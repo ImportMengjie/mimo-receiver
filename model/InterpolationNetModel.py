@@ -19,10 +19,12 @@ class ConvReluBlock(nn.Module):
 
 class InterpolationNetModel(nn.Module):
 
-    def __init__(self, n_r, n_t, num_conv_block=18, channel_num=64, kernel_size=(3, 3)):
+    def __init__(self, n_r, n_t, n_sc, pilot_count: int = 3, num_conv_block=18, channel_num=64, kernel_size=(3, 3)):
         super(InterpolationNetModel, self).__init__()
         self.n_r = n_r
         self.n_t = n_t
+        self.n_sc = n_sc
+        self.pilot_count = pilot_count
         self.num_conv_block = num_conv_block
         self.channel_num = channel_num
         self.kernel_size = kernel_size
@@ -42,8 +44,8 @@ class InterpolationNetModel(nn.Module):
         return out,
 
     def __str__(self) -> str:
-        return '{}_r{}t{}_block{}channel{}'.format(self.__class__.__name__, self.n_r, self.n_t, self.num_conv_block,
-                                                   self.channel_num)
+        return '{}_r{}t{}sc{}p{}_block{}channel{}'.format(self.__class__.__name__, self.n_r, self.n_t, self.n_sc,
+                                                          self.pilot_count, self.num_conv_block, self.channel_num)
 
 
 class InterpolationNetLoss(nn.Module):
