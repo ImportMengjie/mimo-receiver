@@ -34,7 +34,8 @@ class TrainParam:
     lr: float = 0.0000001
     epochs: int = 100
     momentum: float = 0.9
-    only_loss_not_down_stop: bool = True
+    loss_not_down_stop_count: int = 10
+    use_gpu: bool = True
 
 
 class Train:
@@ -49,8 +50,11 @@ class Train:
         self.criterion = criterion
         self.teeClass = teeClass
         self.losses = []
+        if self.param.use_gpu and torch.cuda.is_available():
+            self.model.cuda()
+            self.criterion.cuda()
 
-    def train(self, save=True, reload=True):
+    def train(self, save=True, reload=True, ext_log: str = ''):
         self.losses.clear()
         save_path = os.path.join(Train.save_dir, '{}.pth.tar'.format(str(self.model)))
         current_epoch = 0
@@ -68,8 +72,8 @@ class Train:
         self.model.double()
         logging.info('model:')
         summary(self.model)
-        loss_down = self.param.only_loss_not_down_stop
-        while current_epoch < self.param.epochs or loss_down:
+        loss_down_count = self.param.loss_not_down_stop_count
+        while current_epoch < self.param.epochs or loss_down_count > 0:
             avg_loss = AvgLoss()
             for items in self.dataloader:
                 tee = self.teeClass(items)
@@ -80,10 +84,13 @@ class Train:
                 loss.backward()
                 optimizer.step()
             self.losses.append(avg_loss.avg)
-            if len(self.losses) > self.param.epochs and self.losses[-1] > self.losses[-2]:
-                loss_down = False
+            if current_epoch > self.param.epochs and self.losses[-1] > self.losses[-2]:
+                loss_down_count -= 1
+            elif current_epoch > self.param.epochs and loss_down_count < self.param.loss_not_down_stop_count and \
+                    self.losses[-1] < self.losses[-2] and loss_down_count % 2 == 1:
+                loss_down_count += 1
             avg_loss.reset()
-            logging.info('epoch:{} avg_loss:{}'.format(current_epoch, self.losses[-1]))
+            logging.info('epoch:{} avg_loss:{};{}'.format(current_epoch, self.losses[-1], ext_log))
             scheduler.step()
             if save and (current_epoch % Train.save_per_epoch == 0 or current_epoch + 1 == self.param.epochs):
                 # save model
@@ -104,7 +111,7 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     criterion = DenoisingNetLoss()
     param = TrainParam()
-    param.only_loss_not_down_stop = False
+    param.loss_not_down_stop_count = 100
     param.epochs = 10
 
     train = Train(param, dataloader, model, criterion, DenoisingNetTee)
@@ -129,7 +136,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 10, True, modulation=modulation)
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.epochs = 1000
+    param.lr = 0.01
+    param.epochs = 5000
     training_snr = sorted(training_snr, reverse=True)
 
     def train_fixed_snr(snr_: int):
@@ -138,11 +146,13 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
         train = Train(param, dataloader, model, criterion, DetectionNetTee)
         for layer_num in range(1, model.layer_nums + 1):
             logging.info('training layer:{}'.format(layer_num))
+            train.param.loss_not_down_stop_count = 10
             model.set_training_layer(layer_num, True)
-            train.train(reload=False)
+            train.train(reload=False, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
             logging.info('Fine tune layer:{}'.format(layer_num))
+            train.param.loss_not_down_stop_count = 100
             model.set_training_layer(layer_num, False)
-            train.train(reload=False)
+            train.train(reload=False, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
 
     for snr in training_snr:
         train_fixed_snr(snr)
@@ -152,5 +162,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     # train_denoising_net('data/h_16_16_64_1.mat', [50, 51])
-    train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
+    # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/h_16_16_64_1.mat', [200, 150, 100, 50, 20])
+    train_detection_net('data/h_16_16_64_1.mat', [200])

@@ -3,6 +3,7 @@ from enum import Enum
 
 import h5py
 import numpy as np
+from h5py import Dataset
 
 
 class DataType(Enum):
@@ -43,6 +44,8 @@ class CsiDataloader:
             self.power_ten = int(np.array(files.get('power_ten'))[0][0])
         else:
             self.power_ten = 0
+        if type(H) is not Dataset:
+            H = H.get("value")
         data = CsiDataloader.real2complex(np.array(H).transpose())
         files.close()
 
@@ -58,18 +61,9 @@ class CsiDataloader:
         self.train_H = data[:self.train_count] / np.power(10., self.power_ten)
         self.test_H = data[self.train_count:] / np.power(10., self.power_ten)
 
-    # def noise_n(self, count: int, snr: int):
-    #     noise_var = self.n_t / self.n_r * np.power(10, -snr / 10.)
-    #     noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_r, 1])
-    #     noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_r, 1])
-    #     noise_mat = noise_real + 1j * noise_imag
-    #     return noise_mat
-
     def noise_snr_range(self, count: int, snr_range: list, one_col=False):
         snrs = np.random.randint(snr_range[0], snr_range[1], (count // self.n_c, 1))
         noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
-        # noise_var = np.expand_dims(noise_var.repeat(self.n_c, 0), 1).repeat(self.n_sc, 1).repeat(self.n_r, -1)
-        # noise_var = noise_var.reshape(noise_var.shape + (1,))
         noise_var = noise_var.reshape(noise_var.shape + (1, 1))
         n_t = 1 if one_col else self.n_t
         noise_real = np.random.normal(0, np.sqrt(noise_var) / 2., [count, self.n_sc, self.n_r, n_t])
@@ -126,4 +120,5 @@ class CsiDataloader:
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    cd = CsiDataloader('../data/h_16_8_64_56.mat')
+    cd = CsiDataloader('../data/h_16_8_32_1.mat')
+    # cd = CsiDataloader('../data/h_16_16_64_1.mat')

@@ -22,6 +22,7 @@ class Lcg(nn.Module):
 
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.alpha.shape[0])
+        stdv = 0
         self.alpha.data.uniform_(-stdv, stdv)
         self.beta.data.uniform_(-stdv, stdv)
 
@@ -45,16 +46,19 @@ class DetectionNetModel(nn.Module):
         self.is_training = is_training
         self.lcg_layers = [Lcg(n_t, vector) for _ in range(self.layer_nums)]
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
+        self.fix_forward_layer = False
 
     def set_training_layer(self, training_layer: int, fix_forward_layer=True):
         assert self.is_training
         assert training_layer <= self.layer_nums
         self.training_layer = training_layer
-        for i in range(self.training_layer-1):
+        for i in range(self.training_layer - 1):
             for p in self.lcg_layers[i].parameters():
                 p.requires_grad = not fix_forward_layer
+        self.fix_forward_layer = fix_forward_layer
 
     def reset_requires_grad(self):
+        self.fix_forward_layer = False
         for p in self.parameters():
             p.requires_grad = True
 
@@ -69,6 +73,9 @@ class DetectionNetModel(nn.Module):
     def __str__(self):
         return '{}_r{}t{}_v{}num{}m:{}'.format(self.__class__.__name__, self.n_r, self.n_t, self.vector,
                                                self.layer_nums, self.modulation)
+
+    def get_train_state_str(self):
+        return 'train layer:{}/{},fix forward:{}'.format(self.training_layer, self.layer_nums, self.fix_forward_layer)
 
 
 class DetectionNetLoss(nn.Module):

@@ -2,12 +2,13 @@ function h = channel_generator(n_r, n_t, n_sc, n_s)
     s = qd_simulation_parameters;
     s.center_frequency = 3.0e8;
     s.sample_density = n_s;
+    LightSpeed = 299792458;
 
     sc_bw = 2e4;
 
     area_len = 400;         % area of MT initial positions [meters]
     area_half = area_len/2;
-    track_distance = physconst('LightSpeed')/s.center_frequency*0.5;  % [meters] - for 300MHz
+    track_distance = LightSpeed/s.center_frequency*0.5;  % [meters] - for 300MHz
     track_speed = 0.9;  % [meters/second] - for 300MHz
 
     x_i = area_len*rand(1) - area_half;

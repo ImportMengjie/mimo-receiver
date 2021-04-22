@@ -135,3 +135,5 @@ dmypy.json
 *~
 *.tar
 *.train
+*.zip
+quadriga_src
