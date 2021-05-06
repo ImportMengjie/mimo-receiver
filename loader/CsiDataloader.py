@@ -26,9 +26,9 @@ class CsiDataloader:
 
     @staticmethod
     def real2complex(h_mtx):
-        if len(h_mtx.shape) == 6:
-            h_real = h_mtx[:, :, :, :, :, 0].reshape(h_mtx.shape[:-1])
-            h_imag = h_mtx[:, :, :, :, :, 1].reshape(h_mtx.shape[:-1])
+        if len(h_mtx.shape) == 5:
+            h_real = h_mtx[:, :, :, :, 0].reshape(h_mtx.shape[:-1])
+            h_imag = h_mtx[:, :, :, :, 1].reshape(h_mtx.shape[:-1])
             h_mtx_complex = h_real + 1j * h_imag
             return h_mtx_complex
         else:
@@ -46,14 +46,15 @@ class CsiDataloader:
             self.power_ten = 0
         if type(H) is not Dataset:
             H = H.get("value")
-        data = CsiDataloader.real2complex(np.array(H).transpose())
+        H = np.array(H).transpose()
+        data = CsiDataloader.real2complex(H)
         files.close()
 
         self.J = data.shape[0]
-        self.n_c = data.shape[1]
-        self.n_sc = data.shape[2]
-        self.n_r = data.shape[3]
-        self.n_t = data.shape[4]
+        self.n_c = 1
+        self.n_sc = data.shape[1]
+        self.n_r = data.shape[2]
+        self.n_t = data.shape[3]
         logging.info('loaded J={},n_c={},n_r={},n_t={},n_sc={}'.format(self.J, self.n_c, self.n_r, self.n_t, self.n_sc))
 
         self.train_count = int(self.train_data_radio * self.J) * self.n_c
@@ -120,5 +121,5 @@ class CsiDataloader:
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    cd = CsiDataloader('../data/h_16_8_32_1.mat')
+    cd = CsiDataloader('../data/h_16_16_64_5.mat')
     # cd = CsiDataloader('../data/h_16_16_64_1.mat')

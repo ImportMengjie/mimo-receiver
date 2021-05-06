@@ -35,13 +35,14 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 if __name__ == '__main__':
     csi_dataloader = CsiDataloader('data/h_16_16_64_1.mat')
+    csi_dataloader.test_H = csi_dataloader.test_H * 1
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     model_info = torch.load(save_model_path)
     model.load_state_dict(model_info['state_dict'])
-    detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
-    # detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
+    # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
+    detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 150, 200, 10)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 10, 100, 1)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, )

@@ -38,9 +38,9 @@ if __name__ == '__main__':
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     model_info = torch.load(save_model_path)
     model.load_state_dict(model_info['state_dict'])
-    detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
+    # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMMSE('qpsk')]
-    # detection_methods = [DetectionMMSE('qpsk'), DetectionModel(model, 'qpsk')]
+    detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 20, 200)
     draw_line(x, nmse_dict, lambda n: n <= 100)
