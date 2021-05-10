@@ -21,6 +21,12 @@ class DetectionNetDataset(BaseDataset):
         A_right = torch.cat((-self.A.imag, self.A.real), 2)
         self.A = torch.cat((A_left, A_right), 3)
 
+    def cuda(self):
+        if torch.cuda.is_available():
+            self.A = self.A.cuda()
+            self.b = self.b.cuda()
+            self.x = self.x.cuda()
+
     def __len__(self):
         return self.h.shape[0] * self.h.shape[1]
 

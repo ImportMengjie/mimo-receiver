@@ -29,6 +29,14 @@ class InterpolationNetDataset(BaseDataset):
         if self.interpolation:
             self.h_interpolation = line_interpolation_hp_pilot(self.h_p, self.pilot_idx, csiDataloader.n_sc)
 
+    def cuda(self):
+        if torch.cuda.is_available():
+            if self.interpolation:
+                self.h_interpolation = self.h_interpolation.cuda()
+            else:
+                self.h_p = self.h_p.cuda()
+            self.h = self.h.cuda()
+
     def __len__(self):
         return self.h_p.shape[0]
 
@@ -51,4 +59,3 @@ if __name__ == '__main__':
     csiDataloader = CsiDataloader('../data/h_16_16_64_1.mat')
     dataset = InterpolationNetDataset(csiDataloader, DataType.train, [100, 101], 3)
     h, H = dataset.__getitem__(1)
-    pass

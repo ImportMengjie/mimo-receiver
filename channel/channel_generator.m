@@ -34,6 +34,6 @@ function h = channel_generator(n_r, n_t, n_sc, timeslots)
     c = l.get_channels;
     h = zeros(fix(timeslots), n_r, n_t, n_sc);
     for t_i = 1:timeslots
-        h(t_i,:,:,:) = reshape(c.fr(n_sc*sc_bw, n_sc, t_i), 1, n_r, n_t, n_sc);
+        h(t_i,:,:,:) = reshape(c.fr(n_sc*sc_bw, n_sc, t_i, 1), 1, n_r, n_t, n_sc);
     end
 end

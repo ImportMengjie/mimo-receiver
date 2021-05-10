@@ -1,4 +1,4 @@
-from abc import ABC
+import abc
 
 import numpy as np
 import torch.utils.data
@@ -7,7 +7,7 @@ from loader import CsiDataloader
 from loader import DataType
 
 
-class BaseDataset(torch.utils.data.Dataset, ABC):
+class BaseDataset(torch.utils.data.Dataset, abc.ABC):
 
     def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list) -> None:
         super(BaseDataset, self).__init__()
@@ -21,3 +21,7 @@ class BaseDataset(torch.utils.data.Dataset, ABC):
         self.h = torch.from_numpy(self.h)
         self.n = torch.from_numpy(self.n)
         self.sigma = torch.from_numpy(self.sigma)
+
+    @abc.abstractmethod
+    def cuda(self):
+        pass

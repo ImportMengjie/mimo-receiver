@@ -64,6 +64,8 @@ class DetectionNetModel(nn.Module):
 
     def forward(self, A, b):
         s = torch.zeros(b.shape)
+        if torch.cuda.is_available():
+            s = s.cuda()
         r = b
         d = r
         for i in range(self.training_layer):
