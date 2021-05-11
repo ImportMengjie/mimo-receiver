@@ -66,7 +66,7 @@ class Train:
         if reload and os.path.exists(save_path):
             model_info = torch.load(save_path)
             self.model.load_state_dict(model_info['state_dict'])
-            optimizer.load_state_dict(model_info['optimizer'])
+            # optimizer.load_state_dict(model_info['optimizer'])
             scheduler.load_state_dict(model_info['scheduler'])
             current_epoch = model_info['epoch']
 
@@ -136,7 +136,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r, True, modulation=modulation)
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.lr = 0.01
+    param.lr = 0.001
     param.epochs = 5000
     param.batch_size = csi_dataloader.n_sc
     training_snr = sorted(training_snr, reverse=True)
@@ -149,12 +149,12 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk'):
             train.param.loss_not_down_stop_count = 10
             train.param.lr = 0.001
             model.set_training_layer(layer_num, True)
-            train.train(reload=False, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
+            train.train(reload=True, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
             logging.info('Fine tune layer:{}'.format(layer_num))
-            train.param.loss_not_down_stop_count = 100
-            train.param.lr = 0.00005
+            train.param.loss_not_down_stop_count = 10
+            train.param.lr = 0.001 * 0.5 ** layer_num
             model.set_training_layer(layer_num, False)
-            train.train(reload=False, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
+            train.train(reload=True, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
 
     for snr in training_snr:
         train_fixed_snr(snr)
