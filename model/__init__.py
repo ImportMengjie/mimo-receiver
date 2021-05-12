@@ -1,4 +1,5 @@
 from model.Tee import Tee
+from model.BaseNetModel import BaseNetModel
 from model.DenoisingNetModel import DenoisingNetModel
 from model.DenoisingNetModel import DenoisingNetLoss
 from model.DenoisingNetModel import DenoisingNetTee

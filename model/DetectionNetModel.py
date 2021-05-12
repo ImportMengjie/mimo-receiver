@@ -6,6 +6,7 @@ import torch.utils.data
 import math
 
 from model import Tee
+from model import BaseNetModel
 
 
 class Lcg(nn.Module):
@@ -33,7 +34,7 @@ class Lcg(nn.Module):
         return s_next, r_next, d_next
 
 
-class DetectionNetModel(nn.Module):
+class DetectionNetModel(BaseNetModel):
 
     def __init__(self, n_r, n_t, layer_nums: int, vector=True, modulation='qpsk', is_training=True):
         super().__init__()
@@ -47,6 +48,12 @@ class DetectionNetModel(nn.Module):
         self.lcg_layers = [Lcg(n_t, vector) for _ in range(self.layer_nums)]
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
         self.fix_forward_layer = False
+
+    def get_train_state(self):
+        return {
+            'train_layer': self.training_layer,
+            'fix_forward': self.fix_forward_layer
+        }
 
     def set_training_layer(self, training_layer: int, fix_forward_layer=True):
         assert self.is_training

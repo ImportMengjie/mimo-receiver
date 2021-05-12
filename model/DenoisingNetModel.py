@@ -7,6 +7,7 @@ from loader import CsiDataloader
 from loader import DataType
 from loader import DenoisingNetDataset
 from model import Tee
+from model import BaseNetModel
 
 
 class ConvBnReluBlock(nn.Module):
@@ -80,7 +81,7 @@ class NonBlindDenosingModel(nn.Module):
         return out
 
 
-class DenoisingNetModel(nn.Module):
+class DenoisingNetModel(BaseNetModel):
 
     def __init__(self, n_r, n_t, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32, kernel_size=(3, 3)):
         super(DenoisingNetModel, self).__init__()

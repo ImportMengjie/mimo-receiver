@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.utils.data
 
 from model import Tee
+from model import BaseNetModel
 
 
 class ConvReluBlock(nn.Module):
@@ -17,7 +18,7 @@ class ConvReluBlock(nn.Module):
         return self.relu(self.conv(x))
 
 
-class InterpolationNetModel(nn.Module):
+class InterpolationNetModel(BaseNetModel):
 
     def __init__(self, n_r, n_t, n_sc, pilot_count: int = 3, num_conv_block=18, channel_num=64, kernel_size=(3, 3)):
         super(InterpolationNetModel, self).__init__()

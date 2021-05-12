@@ -36,14 +36,14 @@ class CsiDataloader:
 
     def __init__(self, path):
         self.path = path
-        self.train_data_radio = 0.8
+        self.train_data_radio = 0.9
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')
-        if 'power_ten' in files.keys():
-            self.power_ten = int(np.array(files.get('power_ten'))[0][0])
-        else:
-            self.power_ten = 0
+        # if 'power_ten' in files.keys():
+        #     self.power_ten = int(np.array(files.get('power_ten'))[0][0])
+        # else:
+        self.power_ten = 0
         if type(H) is not Dataset:
             H = H.get("value")
         H = np.array(H).transpose()
