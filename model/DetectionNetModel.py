@@ -22,10 +22,8 @@ class Lcg(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        stdv = 1. / math.sqrt(self.alpha.shape[0])
-        stdv = 0
-        self.alpha.data.uniform_(-stdv, stdv)
-        self.beta.data.uniform_(-stdv, stdv)
+        self.alpha.data.zero_()
+        self.beta.data.zero_()
 
     def forward(self, s, r, d, A):
         s_next = s + self.alpha * d
@@ -62,6 +60,9 @@ class DetectionNetModel(BaseNetModel):
         for i in range(self.training_layer - 1):
             for p in self.lcg_layers[i].parameters():
                 p.requires_grad = not fix_forward_layer
+        # for i in range(self.training_layer, self.layer_nums):
+        #     for p in self.lcg_layers[i].parameters():
+        #         p.requires_grad = False
         self.fix_forward_layer = fix_forward_layer
 
     def reset_requires_grad(self):

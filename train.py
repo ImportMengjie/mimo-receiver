@@ -33,11 +33,12 @@ from model import BaseNetModel
 @dataclass()
 class TrainParam:
     lr: float = 0.0000001
-    epochs: int = 100
+    epochs: int = 10000
     momentum: float = 0.9
     loss_not_down_stop_count: int = 10
     use_gpu: bool = True
     batch_size: int = 64
+    use_scheduler: bool = True
 
 
 class Train:
@@ -60,7 +61,14 @@ class Train:
     def get_save_path(self):
         return Train.get_save_path_from_model(self.model)
 
-    def train(self, save=True, reload=True, ext_log: str = ''):
+    def reset_current_epoch(self):
+        if os.path.exists(self.get_save_path()):
+            model_info = torch.load(self.get_save_path())
+            if 'epoch' in model_info:
+                model_info['epoch'] = 0
+                torch.save(model_info, self.get_save_path())
+
+    def train(self, save=True, reload=True, ext_log: str = '', ):
         self.losses.clear()
         current_epoch = 0
 
@@ -69,10 +77,11 @@ class Train:
         model_info = None
         if reload and os.path.exists(self.get_save_path()):
             model_info = torch.load(self.get_save_path())
-            self.model.load_state_dict(model_info['state_dict'])
-            # optimizer.load_state_dict(model_info['optimizer'])
-            scheduler.load_state_dict(model_info['scheduler'])
-            current_epoch = model_info['epoch']
+            if 'state_dict' in model_info:
+                self.model.load_state_dict(model_info['state_dict'])
+                # optimizer.load_state_dict(model_info['optimizer'])
+                scheduler.load_state_dict(model_info['scheduler'])
+                current_epoch = model_info['epoch']
 
         self.model.train()
         self.model.double()
@@ -90,15 +99,17 @@ class Train:
                 loss.backward()
                 optimizer.step()
             self.losses.append(avg_loss.avg)
-            if current_epoch > self.param.epochs and self.losses[-1] > self.losses[-2]:
-                loss_down_count -= 1
-            elif current_epoch > self.param.epochs and loss_down_count < self.param.loss_not_down_stop_count and \
-                    self.losses[-1] < self.losses[-2] and loss_down_count % 2 == 1:
-                loss_down_count += 1
+            if len(self.losses) > 2:
+                if current_epoch > self.param.epochs and self.losses[-1] > self.losses[-2]:
+                    loss_down_count -= 1
+                elif current_epoch > self.param.epochs and loss_down_count < self.param.loss_not_down_stop_count and \
+                        self.losses[-1] < self.losses[-2] and loss_down_count % 2 == 1:
+                    loss_down_count += 1
             avg_loss.reset()
             logging.info(
                 'epoch:{} avg_loss:{} countdown:{};{}'.format(current_epoch, self.losses[-1], loss_down_count, ext_log))
-            scheduler.step()
+            if self.param.use_scheduler:
+                scheduler.step()
             if save and (current_epoch % Train.save_per_epoch == 0 or current_epoch + 1 == self.param.epochs):
                 # save model
                 if model_info is None:
@@ -179,17 +190,22 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
                 train.param.loss_not_down_stop_count = 10
-                train.param.lr = 0.005
+                train.param.lr = 10000
+                train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
                             ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
                 over_fix_forward = False
+                train.reset_current_epoch()
 
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 10
-            train.param.lr = 0.001 * 0.5 ** layer_num
+            train.param.lr = 200 * 0.5 ** layer_num
+            train.param.epochs = 3000
+            train.param.use_scheduler = True
             model.set_training_layer(layer_num, False)
             train.train(save=save, reload=reload, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
+            train.reset_current_epoch()
 
     for snr in training_snr:
         train_fixed_snr(snr)
