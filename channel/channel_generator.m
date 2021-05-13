@@ -1,6 +1,6 @@
 function h = channel_generator(n_r, n_t, n_sc, timeslots)
     s = qd_simulation_parameters;
-    s.center_frequency = 2.0e9;
+    s.center_frequency = 2.4e9;
     s.sample_density = 2.5;
     s.show_progress_bars = 0;
     LightSpeed = 299792458;
@@ -13,7 +13,7 @@ function h = channel_generator(n_r, n_t, n_sc, timeslots)
     track_distance = half_wave_distance*0.5*timeslots;  % [meters] - for 300MHz
     track_speed = 0.9;  % [meters/second] - for 300MHz
 
-    x_i = area_len*rand(1) - area_half;
+    x_i = 30;
     y_i = 0;
     % theta = pi*(2*rand(1) - 1);
     t = qd_track('circular', track_distance);
@@ -28,9 +28,10 @@ function h = channel_generator(n_r, n_t, n_sc, timeslots)
         
     l.tx_position = [0 0 25]';
 
-    l.tx_array = qd_arrayant.generate( '3gpp-3d',  1, n_t, s.center_frequency(1), 1);                        
-
-    l.rx_array = qd_arrayant.generate( '3gpp-3d',  1, n_r, s.center_frequency(1), 1); % Set omni-rx antenna
+    l.tx_array = qd_arrayant.generate( '3gpp-3d',  1, n_t, s.center_frequency(1), 4, 3);                        
+    l.tx_array.normalize_gain;
+    l.rx_array = qd_arrayant.generate( '3gpp-3d',  1, n_r, s.center_frequency(1), 4, 3);
+    l.rx_array.normalize_gain;
     c = l.get_channels;
     h = zeros(fix(timeslots), n_r, n_t, n_sc);
     for t_i = 1:timeslots

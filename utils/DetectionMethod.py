@@ -62,20 +62,24 @@ class DetectionMethodModel(DetectionMethod):
 
     def __init__(self, model: DetectionNetModel, constellation):
         self.model = model
-        self.model.eval()
+        self.model = self.model.eval()
         super().__init__(constellation)
 
     def get_key_name(self):
         return self.model.__str__()
 
     def get_x_hat(self, y, h, x, var):
-        A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
-        b = h.conj().transpose(-1, -2) @ y
+        h_left = torch.cat((h.real,h.imag), 2)
+        h_right = torch.cat((-h.imag, h.real), 2)
+        h = torch.cat((h_left, h_right), 3)
+        A = h.transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
+        y = torch.cat((y.real, y.imag), 2)
+        b = h.transpose(-1, -2) @ y
 
-        b = torch.cat((b.real, b.imag), 2)
-        A_left = torch.cat((A.real, A.imag), 2)
-        A_right = torch.cat((-A.imag, A.real), 2)
-        A = torch.cat((A_left, A_right), 3)
+        # b = torch.cat((b.real, b.imag), 2)
+        # A_left = torch.cat((A.real, A.imag), 2)
+        # A_right = torch.cat((-A.imag, A.real), 2)
+        # A = torch.cat((A_left, A_right), 3)
 
         x_hat, = self.model(A, b)  # reshape???
         x_hat = x_hat[:, :, 0:x.shape[-2], :] + x_hat[:, :, x.shape[-2]:, :] * 1j

@@ -26,9 +26,11 @@ class Lcg(nn.Module):
         self.beta.data.zero_()
 
     def forward(self, s, r, d, A):
-        s_next = s + self.alpha * d
-        r_next = r - self.alpha * (A @ d)
-        d_next = r_next + self.beta * d
+        alpha = (r.conj().transpose(-1, -2) @ r) / (r.conj().transpose(-1, -2) @ A @ d)
+        s_next = s + alpha * d
+        r_next = r - alpha * (A @ d)
+        beta = (r_next.conj().transpose(-1, -2) @ r_next) / (r.conj().transpose(-1, -2) @ r)
+        d_next = r_next + beta * d
         return s_next, r_next, d_next
 
 

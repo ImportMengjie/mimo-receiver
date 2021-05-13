@@ -36,7 +36,7 @@ class CsiDataloader:
 
     def __init__(self, path):
         self.path = path
-        self.train_data_radio = 0.9
+        self.train_data_radio = 0
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')

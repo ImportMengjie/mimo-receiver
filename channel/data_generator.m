@@ -31,5 +31,5 @@ end
 power_ten = 0;
 
 file_path = sprintf('%s/../data/h_%d_%d_%d_%d.mat',fileparts(mfilename('fullpath')),n_r, n_t, n_sc, timeslots);
-save(file_path, 'H', 'power_ten', '-hdf5');
-% save(file_path, 'H', 'power_ten', '-v7.3');
+% save(file_path, 'H', 'power_ten', '-hdf5');
+save(file_path, 'H', 'power_ten', '-v7.3');
