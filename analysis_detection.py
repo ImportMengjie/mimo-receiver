@@ -33,8 +33,8 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 
 
 if __name__ == '__main__':
-    csi_dataloader = CsiDataloader('data/h_16_16_64_1.mat')
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 10, True, modulation='qpsk')
+    csi_dataloader = CsiDataloader('data/h_16_16_64_5.mat')
+    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 16, True, modulation='qpsk')
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     model_info = torch.load(save_model_path)
     model.load_state_dict(model_info['state_dict'])

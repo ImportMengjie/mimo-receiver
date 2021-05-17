@@ -190,18 +190,19 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
                 train.param.loss_not_down_stop_count = 10
-                train.param.lr = 10000
+                train.param.epochs = 1000
+                train.param.lr = 0.01
                 train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
                             ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
-                over_fix_forward = False
                 train.reset_current_epoch()
 
+            over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 10
-            train.param.lr = 200 * 0.5 ** layer_num
-            train.param.epochs = 3000
+            train.param.lr = 0.01 * 0.5 ** layer_num
+            train.param.epochs = 1000
             train.param.use_scheduler = True
             model.set_training_layer(layer_num, False)
             train.train(save=save, reload=reload, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))

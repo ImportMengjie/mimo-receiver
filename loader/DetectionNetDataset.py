@@ -12,7 +12,7 @@ class DetectionNetDataset(BaseDataset):
         self.n = self.n[:, :, :, 0:1]
         self.x = torch.from_numpy(csiDataloader.get_x(dataType, modulation))
         self.y = self.h @ self.x + self.n
-        self.A = self.h.conj().transpose(-1, -2) @ self.h + self.sigma * torch.eye(csiDataloader.n_t, csiDataloader.n_t)
+        self.A = self.h.conj().transpose(-1, -2) @ self.h + self.sigma**2 * torch.eye(csiDataloader.n_t, csiDataloader.n_t)
         self.b = self.h.conj().transpose(-1, -2) @ self.y
 
         self.x = torch.cat((self.x.real, self.x.imag), 2)
