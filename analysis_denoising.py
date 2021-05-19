@@ -43,6 +43,6 @@ if __name__ == '__main__':
     # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
     detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 10, 200, 1)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 0, 200, 1)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, )

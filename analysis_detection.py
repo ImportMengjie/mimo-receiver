@@ -35,12 +35,14 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 if __name__ == '__main__':
     csi_dataloader = CsiDataloader('data/h_16_16_64_5.mat')
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 16, True, modulation='qpsk')
+    model.set_training_layer(15)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
-    model_info = torch.load(save_model_path)
+    model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
     model.load_state_dict(model_info['state_dict'])
     # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
-    # detection_methods = [DetectionMMSE('qpsk')]
-    detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
+    detection_methods = [DetectionMethodMMSE('qpsk')]
+    # detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
+    # detection_methods = [DetectionMethodModel(model, 'qpsk')]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 20, 200)
-    draw_line(x, nmse_dict, lambda n: n <= 100)
+    draw_line(x, nmse_dict)

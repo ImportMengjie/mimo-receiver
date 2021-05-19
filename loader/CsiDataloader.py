@@ -47,6 +47,7 @@ class CsiDataloader:
         if type(H) is not Dataset:
             H = H.get("value")
         H = np.array(H).transpose()
+        # H = H*1e4
         data = CsiDataloader.real2complex(H)
         files.close()
 
