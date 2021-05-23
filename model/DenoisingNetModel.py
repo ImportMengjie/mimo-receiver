@@ -99,7 +99,7 @@ class DenoisingNetModel(BaseNetModel):
         sigma_map_hat = self.noise_level(x)
         concat_x = torch.cat([sigma_map_hat, x], dim=1)
         h_hat = self.denosing(concat_x)
-        return h_hat, sigma_map_hat
+        return x, sigma_map_hat
 
     def __str__(self) -> str:
         return '{}_r{}t{}_sigma{}denosing{}channel{}'.format(self.__class__.__name__, self.n_r, self.n_t,

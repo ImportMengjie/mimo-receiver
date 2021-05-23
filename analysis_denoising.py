@@ -40,8 +40,8 @@ if __name__ == '__main__':
     # save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     # model_info = torch.load(save_model_path)
     # model.load_state_dict(model_info['state_dict'])
-    # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
-    detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
+    detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
+    # detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
     nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 0, 200, 1)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
