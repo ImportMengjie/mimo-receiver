@@ -137,3 +137,5 @@ dmypy.json
 *.train
 *.zip
 quadriga_src
+*.bak
+*.png

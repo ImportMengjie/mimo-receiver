@@ -34,9 +34,9 @@ class CsiDataloader:
         else:
             raise Exception('real to complex fail, h shape:{}.'.format(h_mtx.shape))
 
-    def __init__(self, path):
+    def __init__(self, path, train_data_radio = 0.9):
         self.path = path
-        self.train_data_radio = 0.9
+        self.train_data_radio = train_data_radio
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')

@@ -32,7 +32,7 @@ class DenoisingNetDataset(BaseDataset):
         h = h.permute(2, 0, 1)
         h_ls = complex2real(self.h_ls[idx, n_sc_idx])
         h_ls = h_ls.permute(2, 0, 1)
-        sigma_map = torch.full((2, self.csiDataloader.n_r, self.csiDataloader.n_t), self.sigma[idx, 0, 0, 0])
+        sigma_map = torch.full((1, self.csiDataloader.n_r, self.csiDataloader.n_t), self.sigma[idx, 0, 0, 0])
         if self.in_cuda:
             sigma_map = sigma_map.cuda()
         return h_ls, h, sigma_map

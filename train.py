@@ -134,8 +134,9 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     criterion = DenoisingNetLoss()
     param = TrainParam()
-    param.loss_not_down_stop_count = 100
+    param.loss_not_down_stop_count = 10
     param.epochs = 10
+    param.lr = 0.001
 
     train = Train(param, dataset, model, criterion, DenoisingNetTee)
     train.train()
@@ -215,7 +216,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/h_16_16_64_5.mat', [150, 200])
+    train_denoising_net('data/h_16_16_64_5.mat', [100, 201])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/h_16_16_64_1.mat', [200, 150, 100, 50, 20])
     # train_detection_net('data/h_16_16_64_5.mat', [200])

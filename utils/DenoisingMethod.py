@@ -54,7 +54,7 @@ class DenoisingMethodModel(DenoisingMethod):
 
     def __init__(self, model: DenoisingNetModel):
         self.model = model
-        self.model.eval()
+        self.model = self.model.eval()
         self.model.double()
 
     def get_key_name(self):

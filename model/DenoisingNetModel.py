@@ -98,7 +98,8 @@ class DenoisingNetModel(BaseNetModel):
     def forward(self, x):
         sigma_map_hat = self.noise_level(x)
         concat_x = torch.cat([sigma_map_hat, x], dim=1)
-        h_hat = self.denosing(concat_x)
+        noise = self.denosing(concat_x)
+        h_hat = x - noise
         return h_hat, sigma_map_hat
 
     def __str__(self) -> str:
@@ -117,6 +118,7 @@ class DenoisingNetLoss(nn.Module):
         l2_h_loss = F.mse_loss(h_hat, h)
         asym_loss = torch.mean(
             torch.abs(self.a - F.relu(sigma_map - sigma_map_hat)) * torch.pow(sigma_map - sigma_map_hat, 2))
+        # asym_loss = F.mse_loss(sigma_map, sigma_map_hat)
         loss = l2_h_loss + 0.5 * asym_loss
         return loss
 
