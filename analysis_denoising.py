@@ -34,7 +34,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 
 if __name__ == '__main__':
-    csi_dataloader = CsiDataloader('data/h_16_16_64_5.mat')
+    csi_dataloader = CsiDataloader('data/h_32_16_64_5.mat')
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     model_info = torch.load(save_model_path)

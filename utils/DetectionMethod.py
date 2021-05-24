@@ -40,7 +40,7 @@ class DetectionMethodZF(DetectionMethod):
         return 'ZF'
 
     def get_x_hat(self, y, h, x, var):
-        x_hat = torch.linalg.inv(h.conj().transpose(-1, -2) @ h) @ h.conj().transpose(-1, -2) @ y
+        x_hat = torch.inverse(h.conj().transpose(-1, -2) @ h) @ h.conj().transpose(-1, -2) @ y
         return x_hat
 
 
@@ -54,7 +54,7 @@ class DetectionMethodMMSE(DetectionMethod):
 
     def get_x_hat(self, y, h, x, var):
         A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
-        x_hat = torch.linalg.inv(A) @ h.conj().transpose(-1, -2) @ y
+        x_hat = torch.inverse(A) @ h.conj().transpose(-1, -2) @ y
         return x_hat
 
 
