@@ -12,7 +12,11 @@ class DenoisingNetDataset(BaseDataset):
     def __init__(self, csiDataloader: CsiDataloader, datatype: DataType, snr_range: list):
         super().__init__(csiDataloader, datatype, snr_range)
         self.x_p = torch.from_numpy(csiDataloader.get_pilot_x())
-        self.y = self.h @ self.x_p + self.n
+        hx = self.h @ self.x_p
+        self.n, self.sigma = csiDataloader.noise_snr_range(hx.detach().numpy(), snr_range)
+        self.sigma = torch.from_numpy(self.sigma**0.5)
+        self.n = torch.from_numpy(self.n)
+        self.y = hx + self.n
         self.h_ls = self.y @ torch.inverse(self.x_p)
         self.in_cuda = False
 
@@ -21,6 +25,7 @@ class DenoisingNetDataset(BaseDataset):
             self.in_cuda = True
             self.h_ls = self.h_ls.cuda()
             self.h = self.h.cuda()
+            self.sigma = self.sigma.cuda()
 
     def __len__(self):
         return self.h.shape[0] * self.h.shape[1]
@@ -31,8 +36,6 @@ class DenoisingNetDataset(BaseDataset):
         h = complex2real(self.h[idx, n_sc_idx])
         h_ls = complex2real(self.h_ls[idx, n_sc_idx])
         sigma = self.sigma[idx, 0, 0, 0]
-        if self.in_cuda:
-            sigma = sigma.cuda()
         return h_ls, h, sigma
 
 

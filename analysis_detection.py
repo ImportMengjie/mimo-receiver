@@ -17,11 +17,12 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
     nmse_list = [[] for _ in range(len(detection_method_list))]
     x = torch.from_numpy(csi_dataloader.get_x(dataType=DataType.test, modulation=modulation))
     h = torch.from_numpy(csi_dataloader.get_h(DataType.test))
+    hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
-        n, var = csi_dataloader.noise_snr_range(h.shape[0], [snr, snr + 1], one_col=True)
+        n, var = csi_dataloader.noise_snr_range(hx.detach().numpy(), [snr, snr + 1], one_col=True)
         n = torch.from_numpy(n)
         var = torch.from_numpy(var)
-        y = h @ x + n
+        y = hx + n
 
         for i in range(0, len(detection_method_list)):
             nmse = detection_method_list[i].get_nmse(y, h, x, var)
@@ -44,5 +45,5 @@ if __name__ == '__main__':
     # detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMethodModel(model, 'qpsk')]
 
-    nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 20, 200)
+    nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 0, 100)
     draw_line(x, nmse_dict)

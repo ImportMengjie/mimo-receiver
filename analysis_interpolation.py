@@ -17,11 +17,12 @@ def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_l
     nmse_list = [[] for _ in range(len(interpolation_method_list))]
     xp = torch.from_numpy(csi_dataloader.get_pilot_x())
     h = torch.from_numpy(csi_dataloader.get_h(DataType.test))
+    hx = h @ xp
     for snr in range(snr_start, snr_end, snr_step):
-        n, var = csi_dataloader.noise_snr_range(h.shape[0], [snr, snr + 1], one_col=False)
+        n, var = csi_dataloader.noise_snr_range(hx.detach().numpy(), [snr, snr + 1], one_col=False)
         n = torch.from_numpy(n)
         var = torch.from_numpy(var)
-        y = h @ xp + n
+        y = hx + n
         for i in range(len(interpolation_method_list)):
             nmse = interpolation_method_list[i].get_nmse(y, h, xp, var)
             nmse_list[i].append(nmse)

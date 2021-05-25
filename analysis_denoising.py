@@ -18,12 +18,12 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
     nmse_list = [[] for _ in range(len(denoising_method_list))]
     x = torch.from_numpy(csi_dataloader.get_pilot_x())
     h = torch.from_numpy(csi_dataloader.get_h(DataType.test))
+    hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
-        n, var = csi_dataloader.noise_snr_range(h.shape[0], [snr, snr + 1], one_col=False)
+        n, var = csi_dataloader.noise_snr_range(hx.detach().numpy(), [snr, snr + 1], one_col=False)
         n = torch.from_numpy(n)
         var = torch.from_numpy(var)
-        y = h @ x + n
-
+        y = hx + n
         for i in range(len(denoising_method_list)):
             nmse = denoising_method_list[i].get_nmse(y, h, x, var)
             nmse_list[i].append(nmse)
@@ -34,14 +34,15 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 
 if __name__ == '__main__':
-    csi_dataloader = CsiDataloader('data/h_32_16_64_5.mat')
+    csi_dataloader = CsiDataloader('data/csi_h.mat')
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
-    model_info = torch.load(save_model_path)
-    model.load_state_dict(model_info['state_dict'])
-    detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
-    # detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
+    if os.path.exists(save_model_path):
+        model_info = torch.load(save_model_path)
+        model.load_state_dict(model_info['state_dict'])
+    # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
+    detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 10, 200, 2)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 0, 100, 2)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, )
