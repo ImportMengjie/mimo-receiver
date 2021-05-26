@@ -11,6 +11,12 @@ class DataType(Enum):
     test = 2
 
 
+class ChannelType(Enum):
+    gaussian = 1
+    gpp = 2
+    unknown = 3
+
+
 class CsiDataloader:
     constellations = {
         'qpsk': np.array(
@@ -37,13 +43,13 @@ class CsiDataloader:
     def __init__(self, path, train_data_radio=0.9):
         self.path = path
         self.train_data_radio = train_data_radio
+        self.channel_type = ChannelType.unknown
+        for t in ChannelType:
+            if t.name in path:
+                self.channel_type = t
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')
-        # if 'power_ten' in files.keys():
-        #     self.power_ten = int(np.array(files.get('power_ten'))[0][0])
-        # else:
-        self.power_ten = 0
         if type(H) is not Dataset:
             H = H.get("value")
         H = np.array(H).transpose()
@@ -64,10 +70,12 @@ class CsiDataloader:
 
     def noise_snr_range(self, hx: np.ndarray, snr_range: list, one_col=False):
         count = hx.shape[0]
-        hx_mean = (CsiDataloader.complex2real(hx)**2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
         snrs = np.random.randint(snr_range[0], snr_range[1], (count, 1))
-        noise_var = hx_mean * np.power(10, -snrs / 10.)
-        noise_var = noise_var.reshape(noise_var.shape + (1, 1))
+        if self.channel_type == ChannelType.gpp:
+            hx_mean = (CsiDataloader.complex2real(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+            noise_var = hx_mean * np.power(10, -snrs / 10.)
+        else:
+            noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         n_t = 1 if one_col else self.n_t
         noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
         noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])

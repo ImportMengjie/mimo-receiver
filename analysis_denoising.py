@@ -18,11 +18,17 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
     nmse_list = [[] for _ in range(len(denoising_method_list))]
     x = torch.from_numpy(csi_dataloader.get_pilot_x())
     h = torch.from_numpy(csi_dataloader.get_h(DataType.test))
+    if torch.cuda.is_available():
+        x = x.cuda()
+        h = h.cuda()
     hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
         n, var = csi_dataloader.noise_snr_range(hx.detach().numpy(), [snr, snr + 1], one_col=False)
         n = torch.from_numpy(n)
         var = torch.from_numpy(var)
+        if torch.cuda.is_available():
+            n = n.cuda()
+            var = var.cuda()
         y = hx + n
         for i in range(len(denoising_method_list)):
             nmse = denoising_method_list[i].get_nmse(y, h, x, var)

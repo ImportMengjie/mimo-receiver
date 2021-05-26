@@ -218,5 +218,5 @@ if __name__ == '__main__':
 
     train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
-    # train_detection_net('data/h_16_16_64_1.mat', [200, 150, 100, 50, 20])
+    # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/h_16_16_64_5.mat', [200])
