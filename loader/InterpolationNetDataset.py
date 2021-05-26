@@ -20,6 +20,11 @@ class InterpolationNetDataset(BaseDataset):
         self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
 
         self.xp = torch.from_numpy(csiDataloader.get_pilot_x())
+        hx = self.h @ self.xp
+        self.n, self.sigma = csiDataloader.noise_snr_range(hx.detach().numpy(), snr_range)
+        self.sigma = torch.from_numpy(self.sigma**0.5)
+        self.n = torch.from_numpy(self.n)
+
         self.n = self.n[:, self.pilot_idx, :, :]
         self.h_p = self.h[:, self.pilot_idx, :, :]
         self.y = self.h_p @ self.xp + self.n

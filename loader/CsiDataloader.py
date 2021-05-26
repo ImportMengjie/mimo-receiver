@@ -34,9 +34,9 @@ class CsiDataloader:
         else:
             raise Exception('real to complex fail, h shape:{}.'.format(h_mtx.shape))
 
-    def __init__(self, path):
+    def __init__(self, path, train_data_radio=0.9):
         self.path = path
-        self.train_data_radio = 0
+        self.train_data_radio = train_data_radio
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')
@@ -59,16 +59,18 @@ class CsiDataloader:
 
         self.train_count = int(self.train_data_radio * self.J) * self.n_c
         data = data.reshape(self.J * self.n_c, self.n_sc, self.n_r, self.n_t)
-        self.train_H = data[:self.train_count] / np.power(10., self.power_ten)
-        self.test_H = data[self.train_count:] / np.power(10., self.power_ten)
+        self.train_H = data[:self.train_count]
+        self.test_H = data[self.train_count:]
 
-    def noise_snr_range(self, count: int, snr_range: list, one_col=False):
-        snrs = np.random.randint(snr_range[0], snr_range[1], (count // self.n_c, 1))
-        noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
+    def noise_snr_range(self, hx: np.ndarray, snr_range: list, one_col=False):
+        count = hx.shape[0]
+        hx_mean = (CsiDataloader.complex2real(hx)**2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+        snrs = np.random.randint(snr_range[0], snr_range[1], (count, 1))
+        noise_var = hx_mean * np.power(10, -snrs / 10.)
         noise_var = noise_var.reshape(noise_var.shape + (1, 1))
         n_t = 1 if one_col else self.n_t
-        noise_real = np.random.normal(0, np.sqrt(noise_var/2.), [count, self.n_sc, self.n_r, n_t])
-        noise_imag = np.random.normal(0, np.sqrt(noise_var/2.), [count, self.n_sc, self.n_r, n_t])
+        noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
+        noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
         noise_mat = noise_real + 1j * noise_imag
         return noise_mat, noise_var
 
