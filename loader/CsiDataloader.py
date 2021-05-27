@@ -71,13 +71,12 @@ class CsiDataloader:
     def noise_snr_range(self, hx: np.ndarray, snr_range: list, one_col=False):
         count = hx.shape[0]
         snrs = np.random.randint(snr_range[0], snr_range[1], (count, 1))
-        if self.channel_type == ChannelType.gpp or one_col == False:
+        if self.channel_type == ChannelType.gpp:
             hx_mean = (CsiDataloader.complex2real(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
             noise_var = hx_mean * np.power(10, -snrs / 10.)
         else:
             noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         n_t = 1 if one_col else self.n_t
-        noise_var = (1 / n_t) ** 2 * noise_var
         noise_var = noise_var.reshape(noise_var.shape + (1, 1))
         noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
         noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])

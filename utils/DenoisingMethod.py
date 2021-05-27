@@ -18,10 +18,7 @@ class DenoisingMethod(abc.ABC):
 
     def get_nmse(self, y, h, x, var):
         h_hat = self.get_h_hat(y, h, x, var)
-        h = complex2real(h)
-        h_hat = complex2real(h_hat)
-
-        nmse = (((h - h_hat) ** 2) / (h ** 2)).mean()
+        nmse = ((torch.abs(h - h_hat) ** 2).sum(-1).sum(-1) / (torch.abs(h) ** 2).sum(-1).sum(-1)).mean()
         nmse = 10 * torch.log10(nmse)
         return nmse.item()
 

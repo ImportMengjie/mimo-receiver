@@ -33,11 +33,16 @@ def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_l
 
 
 if __name__ == '__main__':
-    csi_dataloader = CsiDataloader('data/h_16_16_64_1.mat')
+    import logging
+    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
+    csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat')
     model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_sc,4)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
-    model_info = torch.load(save_model_path)
-    model.load_state_dict(model_info['state_dict'])
+    if os.path.exists(save_model_path):
+        model_info = torch.load(save_model_path)
+        model.load_state_dict(model_info['state_dict'])
+    else:
+        logging.warning('unable load {} model'.format(save_model_path))
     interpolation_methods = [InterpolationMethodLine(csi_dataloader.n_sc, model.pilot_count),
                              InterpolationMethodModel(model)]
 

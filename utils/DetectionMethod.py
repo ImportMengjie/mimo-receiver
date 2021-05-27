@@ -20,10 +20,9 @@ class DetectionMethod(abc.ABC):
 
     def get_nmse(self, y, h, x, var):
         x_hat = self.get_x_hat(y, h, x, var)
-        x = complex2real(x)
-        x_hat = complex2real(x_hat)
-
-        nmse = (((x - x_hat) ** 2) / (x ** 2)).mean()
+        # x = complex2real(x)
+        # x_hat = complex2real(x_hat)
+        nmse = ((torch.abs(x - x_hat)**2).sum(-1).sum(-1) / (torch.abs(x)**2).sum(-1).sum(-1)).mean()
         nmse = 10*torch.log10(nmse)
         return nmse.item()
 
@@ -61,8 +60,7 @@ class DetectionMethodMMSE(DetectionMethod):
 class DetectionMethodModel(DetectionMethod):
 
     def __init__(self, model: DetectionNetModel, constellation):
-        self.model = model
-        self.model.eval()
+        self.model = model.eval()
         super().__init__(constellation)
 
     def get_key_name(self):

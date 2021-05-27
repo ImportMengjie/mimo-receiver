@@ -193,7 +193,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
                 logging.info('training layer:{}'.format(layer_num))
                 train.param.loss_not_down_stop_count = 10
                 train.param.epochs = 100
-                train.param.lr = 0.0005
+                train.param.lr = 0.0001
                 train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
@@ -203,7 +203,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 10
-            train.param.lr = 0.0001 * 0.5 ** layer_num
+            train.param.lr = 0.001 * 0.5 ** layer_num
             train.param.epochs = 100
             train.param.use_scheduler = True
             model.set_training_layer(layer_num, False)

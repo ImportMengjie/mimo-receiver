@@ -28,10 +28,7 @@ class InterpolationMethod(abc.ABC):
 
     def get_nmse(self, y, H, xp, var):
         H_hat = self.get_H_hat(y, H, xp, var)
-        H = complex2real(H)
-        H_hat = complex2real(H_hat)
-
-        nmse = (((H - H_hat) ** 2) / (H ** 2)).mean()
+        nmse = ((torch.abs(H-H_hat)**2).sum(-1).sum(-1)/(torch.abs(H)**2).sum(-1).sum(-1)).mean()
         nmse = 10 * torch.log10(nmse)
         return nmse.item()
 

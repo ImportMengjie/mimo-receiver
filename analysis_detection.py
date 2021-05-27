@@ -40,12 +40,16 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat', 0.1)
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 16, True, modulation='qpsk')
+    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 32, True, modulation='qpsk')
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
         model.load_state_dict(model_info['state_dict'])
+    else:
+        logging.warning('unable load {} file'.format(save_model_path))
     # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
     detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
