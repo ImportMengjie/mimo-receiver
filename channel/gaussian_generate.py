@@ -13,8 +13,8 @@ if __name__ == '__main__':
     import sys
     import os
 
-    n_r = 16
-    n_t = 16
+    n_r = 32
+    n_t = 32
     J = 100
     n_sc = 1
 
@@ -23,5 +23,5 @@ if __name__ == '__main__':
     filename = 'gaussian_{}_{}_{}_{}.mat'.format(n_r, n_t, n_sc, J)
     save_path = os.path.join(os.path.split(sys.argv[0])[0], '../data/{}'.format(filename))
     f = h5py.File(save_path, 'w')
-    f.create_dataset('H', data=H)
+    f.create_dataset('H', data=H.transpose())
     f.close()

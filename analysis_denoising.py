@@ -40,7 +40,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 
 if __name__ == '__main__':
-    csi_dataloader = CsiDataloader('data/csi_h.mat')
+    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat')
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
@@ -49,6 +49,6 @@ if __name__ == '__main__':
     # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
     detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 0, 100, 2)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 10, 100, 2)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, )

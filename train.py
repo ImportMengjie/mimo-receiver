@@ -106,8 +106,10 @@ class Train:
                         self.losses[-1] < self.losses[-2] and loss_down_count % 2 == 1:
                     loss_down_count += 1
             avg_loss.reset()
-            logging.info(
-                'epoch:{} avg_loss:{} countdown:{};{}'.format(current_epoch, self.losses[-1], loss_down_count, ext_log))
+            if current_epoch % 10 == 0:
+                logging.info(
+                    'epoch:{} avg_loss:{} countdown:{};{}'.format(current_epoch, self.losses[-1], loss_down_count,
+                                                                  ext_log))
             if self.param.use_scheduler:
                 scheduler.step()
             if save and (current_epoch % Train.save_per_epoch == 0 or current_epoch + 1 == self.param.epochs):
@@ -156,11 +158,10 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
 
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True):
     csi_dataloader = CsiDataloader(data_path)
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r, True, modulation=modulation)
+    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
+                              modulation=modulation)
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.lr = 0.001
-    param.epochs = 5000
     param.batch_size = csi_dataloader.n_sc
     training_snr = sorted(training_snr, reverse=True)
     if reload and os.path.exists(Train.get_save_path_from_model(model)):
@@ -191,8 +192,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
                 train.param.loss_not_down_stop_count = 10
-                train.param.epochs = 1000
-                train.param.lr = 0.01
+                train.param.epochs = 100
+                train.param.lr = 0.0005
                 train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
@@ -202,8 +203,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 10
-            train.param.lr = 0.01 * 0.5 ** layer_num
-            train.param.epochs = 1000
+            train.param.lr = 0.0001 * 0.5 ** layer_num
+            train.param.epochs = 100
             train.param.use_scheduler = True
             model.set_training_layer(layer_num, False)
             train.train(save=save, reload=reload, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
@@ -211,12 +212,16 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
     for snr in training_snr:
         train_fixed_snr(snr)
+        if save and os.path.exists(Train.get_save_path_from_model(model)):
+            model_infos = torch.load(Train.get_save_path_from_model(model))
+            model_infos.pop('train_state')
+            torch.save(model_infos, Train.get_save_path_from_model(model))
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
+    # train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    # train_detection_net('data/h_16_16_64_5.mat', [200])
+    train_detection_net('data/gaussian_16_16_1_100.mat', [50, 30, 10])
