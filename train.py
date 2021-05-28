@@ -157,6 +157,7 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
 
 
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
+    refinements = [.5, .1, .01]
     csi_dataloader = CsiDataloader(data_path, 1)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
                               modulation=modulation)
@@ -201,7 +202,6 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
                 train.param.loss_not_down_stop_count = 50
                 train.param.epochs = 100
                 train.param.lr = 0.001
-                train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
                             ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
@@ -210,12 +210,15 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 50
-            train.param.lr = 0.001 * 0.5 ** layer_num
             train.param.epochs = 100
-            train.param.use_scheduler = True
-            model.set_training_layer(layer_num, False)
-            train.train(save=save, reload=reload, ext_log='snr:{},model:{}'.format(snr, model.get_train_state_str()))
-            train.reset_current_epoch()
+
+            learn_rate = train.param.lr
+            for factor in refinements:
+                train.param.lr = learn_rate * factor
+                model.set_training_layer(layer_num, False)
+                train.train(save=save, reload=reload,
+                            ext_log='snr:{},model:{},lr:{}'.format(snr, model.get_train_state_str(), param.lr))
+                train.reset_current_epoch()
 
     for snr in training_snr:
         train_fixed_snr(snr)
@@ -231,4 +234,4 @@ if __name__ == '__main__':
     # train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    train_detection_net('data/gaussian_16_16_1_1000.mat', [60, 50, 40, 30, 20], retrain=False)
+    train_detection_net('data/gaussian_16_16_1_10000.mat', [30, 20, 10], retrain=True)
