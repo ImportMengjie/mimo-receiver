@@ -156,13 +156,20 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     train.train()
 
 
-def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True):
-    csi_dataloader = CsiDataloader(data_path)
+def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
+    csi_dataloader = CsiDataloader(data_path, 1)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
                               modulation=modulation)
+    if retrain and os.path.exists(Train.get_save_path_from_model(model)):
+        model_info = torch.load(Train.get_save_path_from_model(model))
+        model_info['snr'] = training_snr[0]
+        model_info['epoch'] = 0
+        model.set_training_layer(1, True)
+        torch.save(model_info, Train.get_save_path_from_model(model))
     criterion = DetectionNetLoss()
     param = TrainParam()
-    param.batch_size = csi_dataloader.n_sc
+    param.batch_size = 100
+    param.use_scheduler = False
     training_snr = sorted(training_snr, reverse=True)
     if reload and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
@@ -191,9 +198,9 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         for layer_num in range(current_train_layer, model.layer_nums + 1):
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
-                train.param.loss_not_down_stop_count = 10
+                train.param.loss_not_down_stop_count = 50
                 train.param.epochs = 100
-                train.param.lr = 0.0001
+                train.param.lr = 0.001
                 train.param.use_scheduler = True
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
@@ -202,7 +209,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
-            train.param.loss_not_down_stop_count = 10
+            train.param.loss_not_down_stop_count = 50
             train.param.lr = 0.001 * 0.5 ** layer_num
             train.param.epochs = 100
             train.param.use_scheduler = True
@@ -224,4 +231,4 @@ if __name__ == '__main__':
     # train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
     # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    train_detection_net('data/gaussian_16_16_1_100.mat', [50, 30, 10])
+    train_detection_net('data/gaussian_16_16_1_1000.mat', [60, 50, 40, 30, 20], retrain=False)

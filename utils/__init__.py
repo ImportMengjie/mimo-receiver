@@ -10,6 +10,7 @@ from utils.DetectionMethod import DetectionMethod
 from utils.DetectionMethod import DetectionMethodZF
 from utils.DetectionMethod import DetectionMethodMMSE
 from utils.DetectionMethod import DetectionMethodModel
+from utils.DetectionMethod import DetectionMethodConjugateGradient
 
 from utils.DenoisingMethod import DenoisingMethod
 from utils.DenoisingMethod import DenoisingMethodLS

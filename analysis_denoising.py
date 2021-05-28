@@ -42,7 +42,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 if __name__ == '__main__':
     import logging
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat')
+    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat', 0)
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):

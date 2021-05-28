@@ -61,18 +61,21 @@ class CsiDataloader:
         self.n_sc = data.shape[1]
         self.n_r = data.shape[2]
         self.n_t = data.shape[3]
-        logging.info('loaded J={},n_c={},n_r={},n_t={},n_sc={}'.format(self.J, self.n_c, self.n_r, self.n_t, self.n_sc))
 
         self.train_count = int(self.train_data_radio * self.J) * self.n_c
         data = data.reshape(self.J * self.n_c, self.n_sc, self.n_r, self.n_t)
         self.train_H = data[:self.train_count]
         self.test_H = data[self.train_count:]
+        logging.info(
+            'loaded J={},n_c={},n_r={},n_t={},n_sc={},train={},test={}'.format(self.J, self.n_c, self.n_r, self.n_t,
+                                                                               self.n_sc, self.train_H.shape[0],
+                                                                               self.test_H.shape[0]))
 
     def noise_snr_range(self, hx: np.ndarray, snr_range: list, one_col=False):
         count = hx.shape[0]
         snrs = np.random.randint(snr_range[0], snr_range[1], (count, 1))
         if self.channel_type == ChannelType.gpp:
-            hx_mean = (CsiDataloader.complex2real(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+            hx_mean = (np.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
             noise_var = hx_mean * np.power(10, -snrs / 10.)
         else:
             noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)

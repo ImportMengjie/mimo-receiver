@@ -9,6 +9,7 @@ from utils import DetectionMethod
 from utils import DetectionMethodZF
 from utils import DetectionMethodMMSE
 from utils import DetectionMethodModel
+from utils import DetectionMethodConjugateGradient
 from utils import draw_line
 
 
@@ -42,7 +43,7 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 if __name__ == '__main__':
     import logging
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat', 0.1)
+    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1000.mat', 0)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 32, True, modulation='qpsk')
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
@@ -52,7 +53,8 @@ if __name__ == '__main__':
         logging.warning('unable load {} file'.format(save_model_path))
     # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
-    detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
+    detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk'),
+                         DetectionMethodConjugateGradient('qpsk', csi_dataloader.n_t), DetectionMethodConjugateGradient('qpsk', csi_dataloader.n_t*2)]
     # detection_methods = [DetectionMethodModel(model, 'qpsk')]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 0, 60)

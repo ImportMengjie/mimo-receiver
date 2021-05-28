@@ -13,9 +13,9 @@ if __name__ == '__main__':
     import sys
     import os
 
-    n_r = 32
-    n_t = 32
-    J = 100
+    n_r = 16
+    n_t = 16
+    J = 10
     n_sc = 1
 
     H = gaussian_channel_generate(J, n_r, n_t, n_sc)
