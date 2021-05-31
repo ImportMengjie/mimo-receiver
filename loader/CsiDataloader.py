@@ -1,8 +1,10 @@
 import logging
+from collections import Iterable
 from enum import Enum
 
 import h5py
 import numpy as np
+import torch
 from h5py import Dataset
 
 
@@ -17,6 +19,34 @@ class ChannelType(Enum):
     unknown = 3
 
 
+use_gpu = True
+
+use_gpu = torch.cuda.is_available() and use_gpu
+
+
+def toNp(tensor: torch.Tensor):
+    return tensor.cpu().detach().numpy()
+
+
+def USE_GPU(func):
+    def wrapper(*args, **kwargs):
+        ret = func(*args, **kwargs)
+        if use_gpu:
+            if isinstance(ret, Iterable):
+                gpu_ret = []
+                for r in ret:
+                    gpu_ret.append(r.gpu())
+                return gpu_ret
+            elif isinstance(ret, torch.Tensor):
+                return ret.gpu()
+            else:
+                raise Exception('unknown ret {}'.format(ret))
+        else:
+            return ret
+
+    return wrapper
+
+
 class CsiDataloader:
     constellations = {
         'qpsk': np.array(
@@ -28,7 +58,7 @@ class CsiDataloader:
     def complex2real(h_mtx):
         h_real = np.real(h_mtx).reshape(h_mtx.shape + (1,))
         h_imag = np.imag(h_mtx).reshape(h_mtx.shape + (1,))
-        return np.concatenate((h_real, h_imag), axis=len(h_real.shape) - 1)
+        return torch.cat((h_real, h_imag), dim=len(h_real.shape) - 1)
 
     @staticmethod
     def real2complex(h_mtx):
@@ -56,6 +86,10 @@ class CsiDataloader:
         data = CsiDataloader.real2complex(H)
         files.close()
 
+        data = torch.from_numpy(data)
+        if use_gpu:
+            data = data.cuda()
+
         self.J = data.shape[0]
         self.n_c = 1
         self.n_sc = data.shape[1]
@@ -71,18 +105,21 @@ class CsiDataloader:
                                                                                self.n_sc, self.train_H.shape[0],
                                                                                self.test_H.shape[0]))
 
-    def noise_snr_range(self, hx: np.ndarray, snr_range: list, one_col=False):
+    @USE_GPU
+    def noise_snr_range(self, hx: torch.Tensor, snr_range: list, one_col=False):
         count = hx.shape[0]
-        snrs = np.random.randint(snr_range[0], snr_range[1], (count, 1))
+        snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
         if self.channel_type == ChannelType.gpp:
-            hx_mean = (np.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
-            noise_var = hx_mean * np.power(10, -snrs / 10.)
+            hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+            noise_var = hx_mean * (10 ** (-snrs / 10.))
         else:
             noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         n_t = 1 if one_col else self.n_t
         noise_var = noise_var.reshape(noise_var.shape + (1, 1))
-        noise_real = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
-        noise_imag = np.random.normal(0, np.sqrt(noise_var / 2.), [count, self.n_sc, self.n_r, n_t])
+        noise_real = torch.from_numpy(
+            np.random.normal(0, np.sqrt(toNp(noise_var) / 2.), [count, self.n_sc, self.n_r, n_t]))
+        noise_imag = torch.from_numpy(
+            np.random.normal(0, np.sqrt(toNp(noise_var) / 2.), [count, self.n_sc, self.n_r, n_t]))
         noise_mat = noise_real + 1j * noise_imag
         return noise_mat, noise_var
 
@@ -92,11 +129,14 @@ class CsiDataloader:
     def test_X(self, modulation):
         return self.random_x(self.test_H.shape[0], modulation)
 
+    @USE_GPU
     def random_x(self, count, modulation):
         constellation_idx_mat = np.random.randint(0, CsiDataloader.constellations[modulation.lower()].shape[0],
                                                   size=(count, self.n_sc, self.n_t, 1))
-        return np.array(list(map(lambda x: CsiDataloader.constellations[modulation.lower()][x], constellation_idx_mat)))
+        return torch.from_numpy(
+            np.array(list(map(lambda x: CsiDataloader.constellations[modulation.lower()][x], constellation_idx_mat))))
 
+    @USE_GPU
     def get_pilot_x(self, n_t=None):
         if n_t is None:
             n_t = self.n_t
@@ -107,7 +147,7 @@ class CsiDataloader:
             while i < n_t:
                 x = np.block([[x, x], [x, -x]]) * (np.sqrt(2) / 2)
                 i *= 2
-            return x
+            return torch.from_numpy(x)
         else:
             raise Exception('n_t:{} not 2^n'.format(n_t))
 

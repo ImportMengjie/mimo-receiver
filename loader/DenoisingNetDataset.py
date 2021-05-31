@@ -3,7 +3,6 @@ import torch
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-
 from utils import complex2real
 
 
@@ -11,11 +10,10 @@ class DenoisingNetDataset(BaseDataset):
 
     def __init__(self, csiDataloader: CsiDataloader, datatype: DataType, snr_range: list):
         super().__init__(csiDataloader, datatype, snr_range)
-        self.x_p = torch.from_numpy(csiDataloader.get_pilot_x())
+        self.x_p = csiDataloader.get_pilot_x()
         hx = self.h @ self.x_p
-        self.n, self.sigma = csiDataloader.noise_snr_range(hx.detach().numpy(), snr_range)
-        self.sigma = torch.from_numpy(self.sigma**0.5)
-        self.n = torch.from_numpy(self.n)
+        self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
+        self.sigma = self.sigma**0.5
         self.y = hx + self.n
         self.h_ls = self.y @ torch.inverse(self.x_p)
         self.in_cuda = False

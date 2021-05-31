@@ -4,10 +4,10 @@ from torch.utils.data.dataset import T_co
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-from utils import complex2real
-from utils import line_interpolation_hp_pilot
-from utils import get_interpolation_pilot_idx
 from utils import DenoisingMethod
+from utils import complex2real
+from utils import get_interpolation_pilot_idx
+from utils import line_interpolation_hp_pilot
 
 
 class InterpolationNetDataset(BaseDataset):
@@ -19,11 +19,10 @@ class InterpolationNetDataset(BaseDataset):
         self.interpolation = interpolation
         self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
 
-        self.xp = torch.from_numpy(csiDataloader.get_pilot_x())
+        self.xp = csiDataloader.get_pilot_x()
         hx = self.h @ self.xp
-        self.n, self.sigma = csiDataloader.noise_snr_range(hx.detach().numpy(), snr_range)
-        self.sigma = torch.from_numpy(self.sigma**0.5)
-        self.n = torch.from_numpy(self.n)
+        self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
+        self.sigma = self.sigma**0.5
 
         self.n = self.n[:, self.pilot_idx, :, :]
         self.h_p = self.h[:, self.pilot_idx, :, :]

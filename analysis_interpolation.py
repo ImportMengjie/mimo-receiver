@@ -4,10 +4,8 @@ from typing import List
 import torch
 
 from loader import CsiDataloader, DataType
-
 from model import InterpolationNetModel
 from train import Train
-
 from utils import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel
 from utils import draw_line
 
@@ -15,13 +13,11 @@ from utils import draw_line
 def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_list: List[InterpolationMethod],
                            snr_start, snr_end, snr_step):
     nmse_list = [[] for _ in range(len(interpolation_method_list))]
-    xp = torch.from_numpy(csi_dataloader.get_pilot_x())
-    h = torch.from_numpy(csi_dataloader.get_h(DataType.test))
+    xp = csi_dataloader.get_pilot_x()
+    h = csi_dataloader.get_h(DataType.test)
     hx = h @ xp
     for snr in range(snr_start, snr_end, snr_step):
-        n, var = csi_dataloader.noise_snr_range(hx.detach().numpy(), [snr, snr + 1], one_col=False)
-        n = torch.from_numpy(n)
-        var = torch.from_numpy(var)
+        n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
         y = hx + n
         for i in range(len(interpolation_method_list)):
             nmse = interpolation_method_list[i].get_nmse(y, h, xp, var)

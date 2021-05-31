@@ -5,29 +5,26 @@ from dataclasses import dataclass
 import torch
 from torch.nn import Module
 from torch.utils.data import DataLoader
-# from torchsummary import summary
 
 from loader import CsiDataloader, BaseDataset
 from loader import DataType
 from loader import DenoisingNetDataset
-from loader import InterpolationNetDataset
 from loader import DetectionNetDataset
-
+from loader import InterpolationNetDataset
+from model import BaseNetModel
 from model import DenoisingNetLoss
 from model import DenoisingNetModel
 from model import DenoisingNetTee
-
-from model import InterpolationNetModel
-from model import InterpolationNetLoss
-from model import InterpolationNetTee
-
-from model import DetectionNetModel
 from model import DetectionNetLoss
+from model import DetectionNetModel
 from model import DetectionNetTee
-
-from utils import AvgLoss
+from model import InterpolationNetLoss
+from model import InterpolationNetModel
+from model import InterpolationNetTee
 from model import Tee
-from model import BaseNetModel
+from utils import AvgLoss
+
+# from torchsummary import summary
 
 
 @dataclass()
@@ -231,7 +228,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    # train_denoising_net('data/h_32_16_64_5.mat', [100, 201])
-    # train_interpolation_net('data/h_16_16_64_1.mat', [50, 51], 4)
+    # train_denoising_net('data/gaussian_16_16_1_100.mat', [100, 201])
+    # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    train_detection_net('data/gaussian_16_16_1_10000.mat', [30, 20, 10], retrain=True)
+    train_detection_net('data/gaussian_16_16_1_10.mat', [30, 20, 10], retrain=False, modulation='qpsk')

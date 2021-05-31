@@ -1,6 +1,5 @@
 import abc
 
-import numpy as np
 import torch.utils.data
 
 from loader import CsiDataloader
@@ -15,8 +14,6 @@ class BaseDataset(torch.utils.data.Dataset, abc.ABC):
         self.dataType = dataType
         self.snr_range = snr_range
         self.h = csiDataloader.get_h(dataType)
-
-        self.h = torch.from_numpy(self.h)
 
     @abc.abstractmethod
     def cuda(self):
