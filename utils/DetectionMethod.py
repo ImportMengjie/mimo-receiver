@@ -1,5 +1,6 @@
 import abc
 import torch
+import torch.nn.functional as F
 
 from model import DetectionNetModel
 from utils import complex2real
@@ -87,7 +88,7 @@ class DetectionMethodConjugateGradient(DetectionMethod):
         super().__init__(constellation)
 
     def get_key_name(self):
-        return 'ConjugateGradient{}'.format(self.iterate)
+        return 'ConjugateGradient-{}'.format(self.iterate)
 
     @staticmethod
     def conjugate(s, r, d, A):

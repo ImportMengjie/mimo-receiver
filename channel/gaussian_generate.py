@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     n_r = 16
     n_t = 16
-    J = 10000
+    J = 1
     n_sc = 1
 
     H = gaussian_channel_generate(J, n_r, n_t, n_sc)

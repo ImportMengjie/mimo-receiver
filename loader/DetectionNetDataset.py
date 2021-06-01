@@ -9,10 +9,13 @@ class DetectionNetDataset(BaseDataset):
 
     def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list, modulation='qpsk') -> None:
         super().__init__(csiDataloader, dataType, snr_range)
+        self.csiDataloader = csiDataloader
+        self.modulation = modulation
+        self.dataType = dataType
         self.x = csiDataloader.get_x(dataType, modulation)
-        hx = self.h @ self.x
-        self.n, self.var = csiDataloader.noise_snr_range(hx, snr_range, True)
-        self.y = hx + self.n
+        self.hx = self.h @ self.x
+        self.n, self.var = csiDataloader.noise_snr_range(self.hx, snr_range, True)
+        self.y = self.hx + self.n
         self.A = self.h.conj().transpose(-1, -2) @ self.h + self.var * torch.eye(csiDataloader.n_t, csiDataloader.n_t)
         self.b = self.h.conj().transpose(-1, -2) @ self.y
 

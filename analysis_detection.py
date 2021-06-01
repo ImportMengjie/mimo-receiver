@@ -14,10 +14,10 @@ from utils import draw_line
 
 
 def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: List[DetectionMethod], snr_start, snr_end,
-                       snr_step=1, modulation='qpsk'):
+                       snr_step=1, modulation='qpsk', dataType=DataType.test):
     nmse_list = [[] for _ in range(len(detection_method_list))]
-    x = csi_dataloader.get_x(dataType=DataType.test, modulation=modulation)
-    h = csi_dataloader.get_h(DataType.test)
+    x = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
+    h = csi_dataloader.get_h(dataType)
     hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
         n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=True)
@@ -34,10 +34,12 @@ def analysis_detection(csi_dataloader: CsiDataloader, detection_method_list: Lis
 
 if __name__ == '__main__':
     import logging
-
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_100.mat', 0)
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, 32, True, modulation='qpsk')
+
+    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=1000)
+    layer = csi_dataloader.n_t*2
+    constellation = 'bpsk'
+    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, layer, True, modulation=constellation)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
@@ -46,10 +48,10 @@ if __name__ == '__main__':
         logging.warning('unable load {} file'.format(save_model_path))
     # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
-    detection_methods = [DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk'),
-                         DetectionMethodConjugateGradient('qpsk', csi_dataloader.n_t),
-                         DetectionMethodConjugateGradient('qpsk', csi_dataloader.n_t * 2)]
-    # detection_methods = [DetectionMethodModel(model, 'qpsk')]
+    # detection_methods = [DetectionMethodMMSE(constellation), DetectionMethodModel(model, constellation),
+    #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t),
+    #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t * 2)]
+    detection_methods = [DetectionMethodModel(model, constellation)]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 0, 60)
     draw_line(x, nmse_dict)

@@ -96,10 +96,10 @@ class DetectionNetLoss(nn.Module):
 
     def forward(self, x, x_hat):
         loss = F.mse_loss(x_hat, x)
-        if self.i % 1000 == 0:
-            nmse = 10 * torch.log10((((x - x_hat) ** 2).sum(-1).sum(-1) / (x ** 2).sum(-1).sum(-1)).mean())
-            print(nmse.item(), end='')
-        self.i += 1
+        # if self.i % 1000 == 0:
+        #     nmse = 10 * torch.log10((((x - x_hat) ** 2).sum(-1).sum(-1) / (x ** 2).sum(-1).sum(-1)).mean())
+        #     print(nmse.item(), end='')
+        # self.i += 1
         return loss
 
 

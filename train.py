@@ -24,12 +24,13 @@ from model import InterpolationNetTee
 from model import Tee
 from utils import AvgLoss
 
+
 # from torchsummary import summary
 
 
 @dataclass()
 class TrainParam:
-    lr: float = 0.0000001
+    lr: float = 0.001
     epochs: int = 10000
     momentum: float = 0.9
     loss_not_down_stop_count: int = 10
@@ -53,6 +54,7 @@ class Train:
             self.model = self.model.cuda()
             self.criterion = self.criterion.cuda()
             dataset.cuda()
+        self.dataset = dataset
         self.dataloader = DataLoader(dataset, param.batch_size, True)
 
     def get_save_path(self):
@@ -65,7 +67,7 @@ class Train:
                 model_info['epoch'] = 0
                 torch.save(model_info, self.get_save_path())
 
-    def train(self, save=True, reload=True, ext_log: str = '', ):
+    def train(self, save=True, reload=True, ext_log: str = ''):
         self.losses.clear()
         current_epoch = 0
 
@@ -155,7 +157,30 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
 
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
     refinements = [.5, .1, .01]
-    csi_dataloader = CsiDataloader(data_path, 1)
+
+    def get_nmse(model: DetectionNetModel, dataset: DetectionNetDataset):
+        nmses = {}
+        for snr in range(0, 30, 2):
+            n, var = dataset.csiDataloader.noise_snr_range(dataset.hx, [snr, snr+1], True)
+            y = dataset.hx + dataset.n
+            A = dataset.h.conj().transpose(-1, -2) @ dataset.h + var * torch.eye(dataset.csiDataloader.n_t, dataset.csiDataloader.n_t)
+            b = dataset.h.conj().transpose(-1, -2) @ y
+            x = dataset.x
+
+            # x = dataset.csiDataloader.get_x(dataset.dataType, dataset.modulation)
+            # x = torch.cat((x.real, x.imag), 2)
+
+            b = torch.cat((b.real, b.imag), 2)
+            A_left = torch.cat((A.real, A.imag), 2)
+            A_right = torch.cat((-A.imag, A.real), 2)
+            A = torch.cat((A_left, A_right), 3)
+
+            x_hat, = model(A, b)
+            nmse = (10*torch.log10((((x-x_hat)**2).sum(-1).sum(-1)/(x**2).sum(-1).sum(-1)).mean())).item()
+            nmses[snr] = nmse
+        return nmses
+
+    csi_dataloader = CsiDataloader(data_path, train_data_radio=1, factor=1000)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
                               modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
@@ -163,6 +188,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         model_info['snr'] = training_snr[0]
         model_info['epoch'] = 0
         model.set_training_layer(1, True)
+        model_info['train_state'] = model.get_train_state()
         torch.save(model_info, Train.get_save_path_from_model(model))
     criterion = DetectionNetLoss()
     param = TrainParam()
@@ -216,9 +242,11 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
                 train.train(save=save, reload=reload,
                             ext_log='snr:{},model:{},lr:{}'.format(snr, model.get_train_state_str(), param.lr))
                 train.reset_current_epoch()
+        return dataset
 
     for snr in training_snr:
-        train_fixed_snr(snr)
+        dataset = train_fixed_snr(snr)
+        logging.warning('NMSE Loss:{}'.format(get_nmse(model, dataset)))
         if save and os.path.exists(Train.get_save_path_from_model(model)):
             model_infos = torch.load(Train.get_save_path_from_model(model))
             model_infos.pop('train_state')
@@ -231,4 +259,4 @@ if __name__ == '__main__':
     # train_denoising_net('data/gaussian_16_16_1_100.mat', [100, 201])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    train_detection_net('data/gaussian_16_16_1_10.mat', [30, 20, 10], retrain=False, modulation='qpsk')
+    train_detection_net('data/gaussian_16_16_1_1.mat', [30, 25, 20, 15, 10], retrain=True, modulation='bpsk')

@@ -52,6 +52,7 @@ class CsiDataloader:
         'qpsk': np.array(
             [complex(1 / np.sqrt(2.), 1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), 1 / np.sqrt(2.)),
              complex(1 / np.sqrt(2.), -1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), -1 / np.sqrt(2.))]),
+        'bpsk': np.array([complex(1, 0), complex(-1, 0)])
     }
 
     @staticmethod
@@ -70,10 +71,13 @@ class CsiDataloader:
         else:
             raise Exception('real to complex fail, h shape:{}.'.format(h_mtx.shape))
 
-    def __init__(self, path, train_data_radio=0.9):
+    def __init__(self, path, train_data_radio=0.9, factor=1):
+        assert factor >= 1
+        assert 0 <= train_data_radio <= 1
         self.path = path
         self.train_data_radio = train_data_radio
         self.channel_type = ChannelType.unknown
+        self.factor = factor
         for t in ChannelType:
             if t.name in path:
                 self.channel_type = t
@@ -89,7 +93,7 @@ class CsiDataloader:
         data = torch.from_numpy(data)
         if use_gpu:
             data = data.cuda()
-
+        data = data.repeat((self.factor, 1, 1, 1))
         self.J = data.shape[0]
         self.n_c = 1
         self.n_sc = data.shape[1]
