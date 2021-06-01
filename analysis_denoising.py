@@ -33,7 +33,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 if __name__ == '__main__':
     import logging
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=1000)
+    csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat', train_data_radio=0, factor=2)
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
@@ -41,9 +41,9 @@ if __name__ == '__main__':
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {}'.format(save_model_path))
-    detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
-    # detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
+    # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
+    detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 0, 60, 2)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 2, 60, 2)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, )
