@@ -23,6 +23,8 @@ from model import InterpolationNetModel
 from model import InterpolationNetTee
 from model import Tee
 from utils import AvgLoss
+from utils import DetectionMethodZF, DetectionMethodMMSE
+from utils import draw_line
 
 
 # from torchsummary import summary
@@ -156,38 +158,52 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
 
 
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
-    refinements = [.5, .1, .01]
+    refinements = [.5, ]
 
-    def get_nmse(model: DetectionNetModel, dataset: DetectionNetDataset):
-        nmses = {}
-        for snr in range(0, 30, 2):
-            n, var = dataset.csiDataloader.noise_snr_range(dataset.hx, [snr, snr+1], True)
-            y = dataset.hx + dataset.n
-            A = dataset.h.conj().transpose(-1, -2) @ dataset.h + var * torch.eye(dataset.csiDataloader.n_t, dataset.csiDataloader.n_t)
+    def get_nmse(model: DetectionNetModel, dataset: DetectionNetDataset, train_snr=-1):
+        nmses = {'model': [], 'ls': [], 'mmse': [], 'model_new_x':[]}
+        mmse = DetectionMethodMMSE('bpsk')
+        ls = DetectionMethodZF('bpsk')
+        snr_range = [0, 50, 1]
+        for snr in range(*snr_range):
+            n, var = dataset.csiDataloader.noise_snr_range(dataset.hx, [snr, snr + 1], True)
+            y = dataset.hx + n
+            A = dataset.h.conj().transpose(-1, -2) @ dataset.h + var * torch.eye(dataset.csiDataloader.n_t,
+                                                                                 dataset.csiDataloader.n_t)
             b = dataset.h.conj().transpose(-1, -2) @ y
             x = dataset.x
-
-            # x = dataset.csiDataloader.get_x(dataset.dataType, dataset.modulation)
-            # x = torch.cat((x.real, x.imag), 2)
+            x_complex = x[:, :, 0:x.shape[-2]//2, :] + x[:, :, x.shape[-2]//2:, :] * 1j
+            nmses['ls'].append(ls.get_nmse(y, dataset.h, x_complex, var))
+            nmses['mmse'].append(mmse.get_nmse(y, dataset.h, x_complex, var))
+            new_x = dataset.csiDataloader.get_x(dataset.dataType, dataset.modulation)
+            new_y = dataset.h@new_x + n
+            new_b = dataset.h.conj().transpose(-1, -2)@new_y
+            new_b = torch.cat((new_b.real, new_b.imag), 2)
+            new_x = torch.cat((new_x.real, new_x.imag), 2)
 
             b = torch.cat((b.real, b.imag), 2)
             A_left = torch.cat((A.real, A.imag), 2)
             A_right = torch.cat((-A.imag, A.real), 2)
             A = torch.cat((A_left, A_right), 3)
 
+            new_x_hat, = model(A, new_b)
             x_hat, = model(A, b)
-            nmse = (10*torch.log10((((x-x_hat)**2).sum(-1).sum(-1)/(x**2).sum(-1).sum(-1)).mean())).item()
-            nmses[snr] = nmse
+            nmse = (10 * torch.log10((((x - x_hat) ** 2).sum(-1).sum(-1) / (x ** 2).sum(-1).sum(-1)).mean())).item()
+            new_nmse = (10 * torch.log10((((new_x - new_x_hat) ** 2).sum(-1).sum(-1) / (new_x ** 2).sum(-1).sum(-1)).mean())).item()
+            nmses['model'].append(nmse)
+            nmses['model_new_x'].append(new_nmse)
+
+        draw_line(list(range(*snr_range)), nmses, 'train snr:{}'.format(train_snr))
         return nmses
 
-    csi_dataloader = CsiDataloader(data_path, train_data_radio=1, factor=1000)
+    csi_dataloader = CsiDataloader(data_path, train_data_radio=1, factor=10000)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
                               modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
         model_info['snr'] = training_snr[0]
         model_info['epoch'] = 0
-        model.set_training_layer(1, True)
+        model.set_training_layer(32, False)
         model_info['train_state'] = model.get_train_state()
         torch.save(model_info, Train.get_save_path_from_model(model))
     criterion = DetectionNetLoss()
@@ -204,6 +220,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
     def train_fixed_snr(snr_: int):
         dataset = DetectionNetDataset(csi_dataloader, DataType.train, [snr_, snr_ + 1], modulation)
         train = Train(param, dataset, model, criterion, DetectionNetTee)
+        train.param.lr = 0.001
         model_infos = None
         current_train_layer = 1
         over_fix_forward = False
@@ -246,17 +263,17 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
     for snr in training_snr:
         dataset = train_fixed_snr(snr)
-        logging.warning('NMSE Loss:{}'.format(get_nmse(model, dataset)))
+        logging.warning('NMSE Loss:{}'.format(get_nmse(model, dataset, snr)))
         if save and os.path.exists(Train.get_save_path_from_model(model)):
             model_infos = torch.load(Train.get_save_path_from_model(model))
-            model_infos.pop('train_state')
+            # model_infos.pop('train_state')
             torch.save(model_infos, Train.get_save_path_from_model(model))
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [100, 201])
+    # train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [2, 60])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 25, 20, 15, 10], retrain=True, modulation='bpsk')
+    train_detection_net('data/gaussian_16_16_1_1.mat', [30, 25, 20, 15, 10], retrain=True, modulation='bpsk')
