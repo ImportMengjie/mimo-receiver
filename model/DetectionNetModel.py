@@ -66,6 +66,9 @@ class DetectionNetModel(BaseNetModel):
         #         p.requires_grad = False
         self.fix_forward_layer = fix_forward_layer
 
+    def set_test_layer(self, test_layer: int):
+        self.training_layer = test_layer
+
     def reset_requires_grad(self):
         self.fix_forward_layer = False
         for p in self.parameters():

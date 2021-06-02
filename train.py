@@ -165,6 +165,51 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     train.train()
 
 
+def train_detection_net_2(data_path: str, snr_range: list, modulation='qpsk', save=True, reload=True, ):
+    refinements = [.5, .1, .01]
+    csi_dataloader = CsiDataloader(data_path, factor=1000)
+    model = DetectionNetModel(csi_dataloader, csi_dataloader.n_r * 2, True, modulation=modulation)
+    test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
+
+    criterion = DetectionNetLoss()
+    param = TrainParam()
+    param.batch_size = 100
+    param.use_scheduler = False
+
+    dataset = DetectionNetDataset(csi_dataloader, DataType.train, snr_range, modulation)
+    train = Train(param, dataset, model, criterion, DetectionNetTee, test_dataset)
+    current_train_layer = 1
+    over_fix_forward = False
+    if reload and os.path.exists(train.get_save_path()):
+        model_infos = torch.load(train.get_save_path())
+        if 'train_state' in model_infos:
+            current_train_layer = model_infos['train_state']['train_layer']
+            over_fix_forward = not model_infos['train_state']['fix_forward']
+            logging.warning('load train state:{}'.format(model_infos['train_state']))
+
+    for layer_num in range(current_train_layer, model.layer_nums + 1):
+        if not over_fix_forward:
+            logging.info('training layer:{}'.format(layer_num))
+            train.param.epochs = 100
+            train.param.lr = 0.001
+            model.set_training_layer(layer_num, True)
+            train.train(save=save, reload=reload,
+                        ext_log='snr:{},model:{}'.format(-1, model.get_train_state_str()))
+            train.reset_current_epoch()
+
+        over_fix_forward = False
+        logging.info('Fine tune layer:{}'.format(layer_num))
+        train.param.epochs = 100
+
+        learn_rate = train.param.lr
+        for factor in refinements:
+            train.param.lr = learn_rate * factor
+            model.set_training_layer(layer_num, False)
+            train.train(save=save, reload=reload,
+                        ext_log='snr:{},model:{},lr:{}'.format(-1, model.get_train_state_str(), param.lr))
+            train.reset_current_epoch()
+
+
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
     refinements = [.5, .1, .01]
     lr = 1e-3
@@ -192,7 +237,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             nmses[snr] = nmse
         return nmses
 
-    csi_dataloader = CsiDataloader(data_path, factor=10000)
+    csi_dataloader = CsiDataloader(data_path, factor=1000)
     model = DetectionNetModel(csi_dataloader, csi_dataloader.n_r * 2, True, modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
@@ -235,8 +280,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         for layer_num in range(current_train_layer, model.layer_nums + 1):
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
-                train.param.loss_not_down_stop_count = 50
-                train.param.epochs = 10
+                train.param.epochs = 100
                 train.param.lr = 0.001
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
@@ -245,8 +289,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
-            train.param.loss_not_down_stop_count = 50
-            train.param.epochs = 10
+            train.param.epochs = 100
 
             learn_rate = train.param.lr
             for factor in refinements:
@@ -273,4 +316,5 @@ if __name__ == '__main__':
     # train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [100, 201])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
+    # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
+    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60],  modulation='bpsk')

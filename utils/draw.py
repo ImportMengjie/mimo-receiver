@@ -5,7 +5,7 @@ plt.rcParams['axes.unicode_minus'] = False
 save_dir = 'result/'
 
 
-def draw_line(x, y_dict: dict, title=None, filter_func=None, save=True, show=True):
+def draw_line(x, y_dict: dict, title=None, filter_func=None, save=True, show=True, xlabel='snr(db)', ylabel='nmse(db)'):
     if filter_func is None:
         filter_func = lambda n: True
     for name, y in y_dict.items():
@@ -13,8 +13,8 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save=True, show=Tru
         plt.plot(x, y, label=name)
     if title:
         plt.title(title)
-    plt.xlabel('snr(db)')
-    plt.ylabel('nmse(db)')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     plt.legend()
     if save:
         save_name = (title if title else '') + '-'.join(y_dict.keys()) + '.png'

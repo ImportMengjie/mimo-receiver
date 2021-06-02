@@ -90,6 +90,9 @@ class DetectionMethodConjugateGradient(DetectionMethod):
     def get_key_name(self):
         return 'ConjugateGradient-{}'.format(self.iterate)
 
+    def get_key_name_short(self):
+        return 'ConjugateGradient'
+
     @staticmethod
     def conjugate(s, r, d, A):
         alpha = (r.conj().transpose(-1, -2) @ r) / (r.conj().transpose(-1, -2) @ A @ d)
