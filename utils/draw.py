@@ -17,7 +17,7 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save=True, show=Tru
     plt.ylabel('nmse(db)')
     plt.legend()
     if save:
-        save_name = '-'.join(y_dict.keys()) + '.png'
+        save_name = (title if title else '') + '-'.join(y_dict.keys()) + '.png'
         save_path = os.path.join(save_dir, save_name)
         plt.savefig(save_path, format='png')
     if show:

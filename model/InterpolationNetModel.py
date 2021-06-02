@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 
+from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
 
@@ -20,11 +21,12 @@ class ConvReluBlock(nn.Module):
 
 class InterpolationNetModel(BaseNetModel):
 
-    def __init__(self, n_r, n_t, n_sc, pilot_count: int = 3, num_conv_block=18, channel_num=64, kernel_size=(3, 3)):
-        super(InterpolationNetModel, self).__init__()
-        self.n_r = n_r
-        self.n_t = n_t
-        self.n_sc = n_sc
+    def __init__(self, csiDataloader: CsiDataloader, pilot_count: int = 3, num_conv_block=18, channel_num=64,
+                 kernel_size=(3, 3)):
+        super(InterpolationNetModel, self).__init__(csiDataloader)
+        self.n_r = csiDataloader.n_r
+        self.n_t = csiDataloader.n_t
+        self.n_sc = csiDataloader.n_sc
         self.pilot_count = pilot_count
         self.num_conv_block = num_conv_block
         self.channel_num = channel_num
@@ -45,8 +47,9 @@ class InterpolationNetModel(BaseNetModel):
         return out,
 
     def __str__(self) -> str:
-        return '{}_r{}t{}sc{}p{}_block{}channel{}'.format(self.__class__.__name__, self.n_r, self.n_t, self.n_sc,
-                                                          self.pilot_count, self.num_conv_block, self.channel_num)
+        return '{}-{}_r{}t{}sc{}p{}_block{}channel{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r,
+                                                             self.n_t, self.n_sc,
+                                                             self.pilot_count, self.num_conv_block, self.channel_num)
 
 
 class InterpolationNetLoss(nn.Module):

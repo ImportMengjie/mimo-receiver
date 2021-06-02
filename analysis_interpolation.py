@@ -30,9 +30,10 @@ def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_l
 
 if __name__ == '__main__':
     import logging
+
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat')
-    model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_sc,4)
+    model = InterpolationNetModel(csi_dataloader, 4)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path)
@@ -44,4 +45,4 @@ if __name__ == '__main__':
 
     nmse_dict, x = analysis_interpolation(csi_dataloader, interpolation_methods, 150, 200, 10)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
-    draw_line(x, nmse_dict, )
+    draw_line(x, nmse_dict, title='interpolation-{}'.format(csi_dataloader.__str__()))

@@ -141,7 +141,7 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
-    model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
+    model = DenoisingNetModel(csi_dataloader)
     criterion = DenoisingNetLoss()
     param = TrainParam()
     param.loss_not_down_stop_count = 10
@@ -157,7 +157,7 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     dataset = InterpolationNetDataset(csi_dataloader, DataType.train, snr_range, pilot_count)
     test_dataset = InterpolationNetDataset(csi_dataloader, DataType.test, snr_range, pilot_count)
 
-    model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_sc, pilot_count)
+    model = InterpolationNetModel(csi_dataloader, pilot_count)
     criterion = InterpolationNetLoss()
     param = TrainParam()
 
@@ -193,13 +193,12 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         return nmses
 
     csi_dataloader = CsiDataloader(data_path, factor=10000)
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
-                              modulation=modulation)
+    model = DetectionNetModel(csi_dataloader, csi_dataloader.n_r * 2, True, modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
         model_info['snr'] = training_snr[0]
         model_info['epoch'] = 0
-        model.set_training_layer(32, False)
+        model.set_training_layer(1, True)
         model_info['train_state'] = model.get_train_state()
         torch.save(model_info, Train.get_save_path_from_model(model))
     criterion = DetectionNetLoss()

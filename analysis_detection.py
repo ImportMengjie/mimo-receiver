@@ -39,7 +39,7 @@ if __name__ == '__main__':
     csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=1000)
     layer = csi_dataloader.n_t*2
     constellation = 'qpsk'
-    model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, layer, True, modulation=constellation)
+    model = DetectionNetModel(csi_dataloader, layer, True, modulation=constellation)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
@@ -54,4 +54,4 @@ if __name__ == '__main__':
     # detection_methods = [DetectionMethodModel(model, constellation)]
 
     nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 5, 60, modulation=constellation)
-    draw_line(x, nmse_dict)
+    draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))

@@ -34,7 +34,7 @@ if __name__ == '__main__':
     import logging
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat', train_data_radio=0, factor=1)
-    model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
+    model = DenoisingNetModel(csi_dataloader)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path)
@@ -46,4 +46,4 @@ if __name__ == '__main__':
 
     nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 2, 60, 2)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
-    draw_line(x, nmse_dict, )
+    draw_line(x, nmse_dict, title='denoising-{}'.format(csi_dataloader.__str__()))

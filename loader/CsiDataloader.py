@@ -176,6 +176,9 @@ class CsiDataloader:
             return self.test_X(modulation)
         raise Exception("can't support this type {}".format(dataType))
 
+    def __str__(self):
+        return ('n' if 'normal' in self.path else '') + self.channel_type.name
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')

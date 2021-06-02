@@ -5,6 +5,7 @@ import torch.utils.data
 
 import math
 
+from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
 
@@ -34,16 +35,16 @@ class Lcg(nn.Module):
 
 class DetectionNetModel(BaseNetModel):
 
-    def __init__(self, n_r, n_t, layer_nums: int, vector=True, modulation='qpsk', is_training=True):
-        super().__init__()
-        self.n_r = n_r
-        self.n_t = n_t
+    def __init__(self, csiDataloader: CsiDataloader, layer_nums: int, vector=True, modulation='qpsk', is_training=True):
+        super().__init__(csiDataloader)
+        self.n_r = csiDataloader.n_r
+        self.n_t = csiDataloader.n_t
         self.vector = vector
         self.modulation = modulation
         self.layer_nums = layer_nums
         self.training_layer = layer_nums
         self.is_training = is_training
-        self.lcg_layers = [Lcg(n_t, vector) for _ in range(self.layer_nums)]
+        self.lcg_layers = [Lcg(csiDataloader.n_t, vector) for _ in range(self.layer_nums)]
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
         self.fix_forward_layer = False
 
@@ -81,8 +82,9 @@ class DetectionNetModel(BaseNetModel):
         return s,
 
     def __str__(self):
-        return '{}_r{}t{}_v{}num{}m:{}'.format(self.__class__.__name__, self.n_r, self.n_t, self.vector,
-                                               self.layer_nums, self.modulation)
+        return '{}-{}_r{}t{}_v{}num{}m{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
+                                                 self.vector,
+                                                 self.layer_nums, self.modulation)
 
     def get_train_state_str(self):
         return 'train layer:{}/{},fix forward:{}'.format(self.training_layer, self.layer_nums, self.fix_forward_layer)
