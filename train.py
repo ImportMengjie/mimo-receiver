@@ -33,10 +33,10 @@ class TrainParam:
     lr: float = 0.001
     epochs: int = 10000
     momentum: float = 0.9
-    loss_not_down_stop_count: int = 10
     use_gpu: bool = True
     batch_size: int = 64
     use_scheduler: bool = True
+    stop_when_test_loss_down_epoch_count = 20
 
 
 class Train:
@@ -44,7 +44,7 @@ class Train:
     save_per_epoch = 5
 
     def __init__(self, param: TrainParam, dataset: BaseDataset, model: BaseNetModel, criterion: Module,
-                 teeClass: Tee.__class__):
+                 teeClass: Tee.__class__, test_dataset: BaseDataset):
         self.param = param
         self.model = model
         self.criterion = criterion
@@ -56,6 +56,10 @@ class Train:
             dataset.cuda()
         self.dataset = dataset
         self.dataloader = DataLoader(dataset, param.batch_size, True)
+        self.test_dataset = test_dataset
+        self.test_dataloader = None
+        if self.test_dataset:
+            self.test_dataloader = DataLoader(self.test_dataset, len(self.test_dataset))
 
     def get_save_path(self):
         return Train.get_save_path_from_model(self.model)
@@ -70,6 +74,7 @@ class Train:
     def train(self, save=True, reload=True, ext_log: str = ''):
         self.losses.clear()
         current_epoch = 0
+        test_loss = []
 
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
@@ -86,8 +91,7 @@ class Train:
         self.model.double()
         # logging.info('model:')
         # summary(self.model)
-        loss_down_count = self.param.loss_not_down_stop_count
-        while current_epoch < self.param.epochs or loss_down_count > 0:
+        while True:
             avg_loss = AvgLoss()
             for items in self.dataloader:
                 tee = self.teeClass(items)
@@ -98,20 +102,24 @@ class Train:
                 loss.backward()
                 optimizer.step()
             self.losses.append(avg_loss.avg)
-            if len(self.losses) > 2:
-                if current_epoch > self.param.epochs and self.losses[-1] > self.losses[-2]:
-                    loss_down_count -= 1
-                elif current_epoch > self.param.epochs and loss_down_count < self.param.loss_not_down_stop_count and \
-                        self.losses[-1] < self.losses[-2] and loss_down_count % 2 == 1:
-                    loss_down_count += 1
             avg_loss.reset()
             if current_epoch % 10 == 0:
                 logging.info(
-                    'epoch:{} avg_loss:{} countdown:{};{}'.format(current_epoch, self.losses[-1], loss_down_count,
-                                                                  ext_log))
+                    'epoch:{} avg_loss:{};{}'.format(current_epoch, self.losses[-1], ext_log))
+            if self.test_dataloader and current_epoch % self.param.stop_when_test_loss_down_epoch_count == 0 and current_epoch >= self.param.epochs:
+                items = list(self.test_dataloader)[0]
+                tee = self.teeClass(items)
+                tee.set_model_output(self.model.eval()(*tee.get_model_input()))
+                loss = self.criterion(*tee.get_loss_input())
+                test_loss.append(loss.item())
+                logging.warning('test loss:{} in epoch:{}'.format(loss, current_epoch))
+                if len(test_loss) > 1 and test_loss[-1] > test_loss[-2]:
+                    logging.error('test loss down [-2]{}, [-1]{}'.format(test_loss[-2], test_loss[-1]))
+                    break
+                self.model.train()
             if self.param.use_scheduler:
                 scheduler.step()
-            if save and (current_epoch % Train.save_per_epoch == 0 or current_epoch + 1 == self.param.epochs):
+            if save and (current_epoch % Train.save_per_epoch == 0):
                 # save model
                 if model_info is None:
                     model_info = {}
@@ -131,6 +139,7 @@ class Train:
 def train_denoising_net(data_path: str, snr_range: list, ):
     csi_dataloader = CsiDataloader(data_path)
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
+    test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
     model = DenoisingNetModel(csi_dataloader.n_r, csi_dataloader.n_t)
     criterion = DenoisingNetLoss()
@@ -139,31 +148,34 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     param.epochs = 10
     param.lr = 0.001
 
-    train = Train(param, dataset, model, criterion, DenoisingNetTee)
+    train = Train(param, dataset, model, criterion, DenoisingNetTee, test_dataset)
     train.train()
 
 
 def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     csi_dataloader = CsiDataloader(data_path)
     dataset = InterpolationNetDataset(csi_dataloader, DataType.train, snr_range, pilot_count)
+    test_dataset = InterpolationNetDataset(csi_dataloader, DataType.test, snr_range, pilot_count)
 
     model = InterpolationNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_sc, pilot_count)
     criterion = InterpolationNetLoss()
     param = TrainParam()
 
-    train = Train(param, dataset, model, criterion, InterpolationNetTee)
+    train = Train(param, dataset, model, criterion, InterpolationNetTee, test_dataset)
     train.train()
 
 
 def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
     refinements = [.5, .1, .01]
+    lr = 1e-3
 
     def get_nmse(model: DetectionNetModel, dataset: DetectionNetDataset):
         nmses = {}
         for snr in range(0, 30, 2):
-            n, var = dataset.csiDataloader.noise_snr_range(dataset.hx, [snr, snr+1], True)
+            n, var = dataset.csiDataloader.noise_snr_range(dataset.hx, [snr, snr + 1], True)
             y = dataset.hx + dataset.n
-            A = dataset.h.conj().transpose(-1, -2) @ dataset.h + var * torch.eye(dataset.csiDataloader.n_t, dataset.csiDataloader.n_t)
+            A = dataset.h.conj().transpose(-1, -2) @ dataset.h + var * torch.eye(dataset.csiDataloader.n_t,
+                                                                                 dataset.csiDataloader.n_t)
             b = dataset.h.conj().transpose(-1, -2) @ y
             x = dataset.x
 
@@ -176,18 +188,18 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             A = torch.cat((A_left, A_right), 3)
 
             x_hat, = model(A, b)
-            nmse = (10*torch.log10((((x-x_hat)**2).sum(-1).sum(-1)/(x**2).sum(-1).sum(-1)).mean())).item()
+            nmse = (10 * torch.log10((((x - x_hat) ** 2).sum(-1).sum(-1) / (x ** 2).sum(-1).sum(-1)).mean())).item()
             nmses[snr] = nmse
         return nmses
 
-    csi_dataloader = CsiDataloader(data_path, train_data_radio=1, factor=1000)
+    csi_dataloader = CsiDataloader(data_path, factor=10000)
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, csi_dataloader.n_r * 2, True,
                               modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
         model_info['snr'] = training_snr[0]
         model_info['epoch'] = 0
-        model.set_training_layer(1, True)
+        model.set_training_layer(32, False)
         model_info['train_state'] = model.get_train_state()
         torch.save(model_info, Train.get_save_path_from_model(model))
     criterion = DetectionNetLoss()
@@ -201,9 +213,11 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             logging.warning('snr list:{}, start snr:{}'.format(training_snr, model_info['snr']))
             training_snr = training_snr[training_snr.index(model_info['snr']):]
 
+    test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, [5, 40], modulation)
+
     def train_fixed_snr(snr_: int):
         dataset = DetectionNetDataset(csi_dataloader, DataType.train, [snr_, snr_ + 1], modulation)
-        train = Train(param, dataset, model, criterion, DetectionNetTee)
+        train = Train(param, dataset, model, criterion, DetectionNetTee, test_dataset)
         model_infos = None
         current_train_layer = 1
         over_fix_forward = False
@@ -223,7 +237,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             if not over_fix_forward:
                 logging.info('training layer:{}'.format(layer_num))
                 train.param.loss_not_down_stop_count = 50
-                train.param.epochs = 100
+                train.param.epochs = 10
                 train.param.lr = 0.001
                 model.set_training_layer(layer_num, True)
                 train.train(save=save, reload=reload,
@@ -233,7 +247,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             over_fix_forward = False
             logging.info('Fine tune layer:{}'.format(layer_num))
             train.param.loss_not_down_stop_count = 50
-            train.param.epochs = 100
+            train.param.epochs = 10
 
             learn_rate = train.param.lr
             for factor in refinements:
@@ -245,8 +259,9 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         return dataset
 
     for snr in training_snr:
+        param.lr = lr
         dataset = train_fixed_snr(snr)
-        logging.warning('NMSE Loss:{}'.format(get_nmse(model, dataset)))
+        # logging.warning('NMSE Loss:{}'.format(get_nmse(model, dataset)))
         if save and os.path.exists(Train.get_save_path_from_model(model)):
             model_infos = torch.load(Train.get_save_path_from_model(model))
             model_infos.pop('train_state')
@@ -256,7 +271,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [100, 201])
+    # train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [100, 201])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
-    # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 25, 20, 15, 10], retrain=True, modulation='bpsk')
+    train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')

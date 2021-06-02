@@ -5,12 +5,14 @@ plt.rcParams['axes.unicode_minus'] = False
 save_dir = 'result/'
 
 
-def draw_line(x, y_dict: dict, filter_func=None, save=True, show=True):
+def draw_line(x, y_dict: dict, title=None, filter_func=None, save=True, show=True):
     if filter_func is None:
         filter_func = lambda n: True
     for name, y in y_dict.items():
         y = list(map(lambda n: n if filter_func(n) else None, y))
         plt.plot(x, y, label=name)
+    if title:
+        plt.title(title)
     plt.xlabel('snr(db)')
     plt.ylabel('nmse(db)')
     plt.legend()

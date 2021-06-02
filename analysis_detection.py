@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=1000)
     layer = csi_dataloader.n_t*2
-    constellation = 'bpsk'
+    constellation = 'qpsk'
     model = DetectionNetModel(csi_dataloader.n_r, csi_dataloader.n_t, layer, True, modulation=constellation)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
@@ -46,12 +46,12 @@ if __name__ == '__main__':
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {} file'.format(save_model_path))
-    # detection_methods = [DetectionMethodZF('qpsk'), DetectionMethodMMSE('qpsk'), DetectionMethodModel(model, 'qpsk')]
+    detection_methods = [DetectionMethodZF(constellation), DetectionMethodMMSE(constellation), DetectionMethodModel(model, constellation)]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
     # detection_methods = [DetectionMethodMMSE(constellation), DetectionMethodModel(model, constellation),
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t),
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t * 2)]
-    detection_methods = [DetectionMethodModel(model, constellation)]
+    # detection_methods = [DetectionMethodModel(model, constellation)]
 
-    nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 0, 60)
+    nmse_dict, x = analysis_detection(csi_dataloader, detection_methods, 5, 60, modulation=constellation)
     draw_line(x, nmse_dict)

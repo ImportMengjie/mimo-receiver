@@ -1,4 +1,3 @@
-addpath('/data/Mehrdad/QuaDriGa_2017/quadriga_src')
 more off
 close all
 clear all
@@ -16,6 +15,7 @@ centerFrequency = 2.53e9;            % Center frequency in Hz
 bandwidth = 1e6;                     % Bandwidth in Hz
 numSubcarriers = 1024;               % Number of sub-carriers
 subSampling = 4;                     % Only take every subsampling's sub-carriers
+n_sc = numSubcarriers/subSampling
 
 antennaHeight = 25;                  % Antenna height of the bse station in m
 antennaSpacing = 1/2;                % Antenna spacing in multiples of the wave length

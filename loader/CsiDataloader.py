@@ -35,10 +35,10 @@ def USE_GPU(func):
             if isinstance(ret, Iterable):
                 gpu_ret = []
                 for r in ret:
-                    gpu_ret.append(r.gpu())
+                    gpu_ret.append(r.cuda())
                 return gpu_ret
             elif isinstance(ret, torch.Tensor):
-                return ret.gpu()
+                return ret.cuda()
             else:
                 raise Exception('unknown ret {}'.format(ret))
         else:
