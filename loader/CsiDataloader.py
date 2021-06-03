@@ -112,6 +112,7 @@ class CsiDataloader:
     @USE_GPU
     def noise_snr_range(self, hx: torch.Tensor, snr_range: list, one_col=False):
         count = hx.shape[0]
+        hx = hx.cpu()
         snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
         if self.channel_type == ChannelType.gpp:
             hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)

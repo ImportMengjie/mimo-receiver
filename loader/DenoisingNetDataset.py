@@ -15,7 +15,11 @@ class DenoisingNetDataset(BaseDataset):
         self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
         self.sigma = self.sigma**0.5
         self.y = hx + self.n
-        self.h_ls = self.y @ torch.inverse(self.x_p)
+        if torch.cuda.is_available():
+            x_p_inv = torch.inverse(self.x_p.cpu()).cuda()
+        else:
+            x_p_inv = torch.inverse(self.x_p)
+        self.h_ls = self.y @ x_p_inv
         self.in_cuda = False
 
     def cuda(self):

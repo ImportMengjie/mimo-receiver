@@ -88,7 +88,7 @@ if __name__ == '__main__':
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t * 2)]
     # detection_methods = [DetectionMethodModel(model, constellation)]
 
-    nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 5, 60, modulation=constellation)
+    nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 5, 30, modulation=constellation)
     draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))
 
     nmse_dict, iter_list = analysis_detection_layer(csi_dataloader, [model], 30, 'bpsk')

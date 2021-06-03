@@ -16,7 +16,10 @@ class DetectionNetDataset(BaseDataset):
         self.hx = self.h @ self.x
         self.n, self.var = csiDataloader.noise_snr_range(self.hx, snr_range, True)
         self.y = self.hx + self.n
-        self.A = self.h.conj().transpose(-1, -2) @ self.h + self.var * torch.eye(csiDataloader.n_t, csiDataloader.n_t)
+        I = torch.eye(csiDataloader.n_t, csiDataloader.n_t)
+        if torch.cuda.is_available():
+            I = I.cuda()
+        self.A = self.h.conj().transpose(-1, -2) @ self.h + self.var * I
         self.b = self.h.conj().transpose(-1, -2) @ self.y
 
         self.x = torch.cat((self.x.real, self.x.imag), 2)

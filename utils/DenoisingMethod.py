@@ -42,7 +42,10 @@ class DenoisingMethodMMSE(DenoisingMethod):
         r_h = conj_t(h) @ h
         n_r = y.shape[-2]
         n_t = x.shape[-2]
-        h_hat = y @ torch.inverse(conj_t(x) @ r_h @ x + n_r * var * torch.eye(n_t, n_t)) @ conj_t(
+        I = torch.eye(n_t, n_t)
+        if torch.cuda.is_available():
+            I = I.cuda()
+        h_hat = y @ torch.inverse(conj_t(x) @ r_h @ x + n_r * var * I) @ conj_t(
             x) @ r_h
         return h_hat
 

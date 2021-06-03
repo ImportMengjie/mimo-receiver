@@ -17,8 +17,10 @@ class Padding(nn.Module):
         self.kernel_size = kernel_size[1]
 
     def forward(self, x):
-        return torch.cat((x[:, :, :, :x.shape[-1] // 2], torch.zeros(x.shape[:-1] + (self.kernel_size - 1,)),
-                          x[:, :, :, x.shape[-1] // 2:]), -1)
+        zeros = torch.zeros(x.shape[:-1] + (self.kernel_size - 1,))
+        if torch.cuda.is_available():
+            zeros = zeros.cuda()
+        return torch.cat((x[:, :, :, :x.shape[-1] // 2], zeros, x[:, :, :, x.shape[-1] // 2:]), -1)
 
 
 class ConvBnReluBlock(nn.Module):

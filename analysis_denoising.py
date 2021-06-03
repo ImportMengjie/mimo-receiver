@@ -33,7 +33,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 if __name__ == '__main__':
     import logging
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat', train_data_radio=0, factor=1)
+    csi_dataloader = CsiDataloader('data/normal_3gpp_16_16_64_5_5.mat', train_data_radio=0, factor=1)
     model = DenoisingNetModel(csi_dataloader)
     save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
     if os.path.exists(save_model_path):
@@ -41,6 +41,8 @@ if __name__ == '__main__':
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {}'.format(save_model_path))
+    if torch.cuda.is_available():
+        model = model.cuda()
     # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
     detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 

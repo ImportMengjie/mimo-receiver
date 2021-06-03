@@ -137,7 +137,7 @@ class Train:
 
 
 def train_denoising_net(data_path: str, snr_range: list, ):
-    csi_dataloader = CsiDataloader(data_path)
+    csi_dataloader = CsiDataloader(data_path, factor=2)
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
@@ -165,9 +165,9 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count: int):
     train.train()
 
 
-def train_detection_net_2(data_path: str, snr_range: list, modulation='qpsk', save=True, reload=True, ):
+def train_detection_net_2(data_path: str, snr_range: list, modulation='bpsk', save=True, reload=True, retrain=False):
     refinements = [.5, .1, .01]
-    csi_dataloader = CsiDataloader(data_path, factor=1000)
+    csi_dataloader = CsiDataloader(data_path, factor=10000)
     model = DetectionNetModel(csi_dataloader, csi_dataloader.n_r * 2, True, modulation=modulation)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
 
@@ -180,7 +180,7 @@ def train_detection_net_2(data_path: str, snr_range: list, modulation='qpsk', sa
     train = Train(param, dataset, model, criterion, DetectionNetTee, test_dataset)
     current_train_layer = 1
     over_fix_forward = False
-    if reload and os.path.exists(train.get_save_path()):
+    if not retrain and reload and os.path.exists(train.get_save_path()):
         model_infos = torch.load(train.get_save_path())
         if 'train_state' in model_infos:
             current_train_layer = model_infos['train_state']['train_layer']
@@ -313,8 +313,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    # train_denoising_net('data/normal_3gpp_16_16_64_5_5.mat', [100, 201])
+    # train_denoising_net('data/3gpp_16_16_64_5_5.mat', [5, 100])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
-    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60],  modulation='bpsk')
+    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60],  modulation='bpsk', retrain=True)

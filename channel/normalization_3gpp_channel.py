@@ -10,9 +10,10 @@ def normalization_3gpp_channel(H: torch.Tensor):
     n_sc = H.shape[1]
     n_r = H.shape[2]
     n_t = H.shape[3]
-    sum_h = (H ** 2).sum()
+    sum_h = (H ** 2).sum(-1).sum(-1).sum(-1).sum(-1)
+    sum_h = sum_h.reshape(-1, 1, 1, 1, 1)
     factor = (n_r * n_t * n_sc) / sum_h
-    logging.warning('factor:{}'.format(factor.item()))
+    # logging.warning('factor:{}'.format(factor.item()))
     H_normalization = H * (factor ** 0.5)
     return H_normalization
 
