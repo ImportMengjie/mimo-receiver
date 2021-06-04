@@ -2,14 +2,15 @@ import abc
 import torch
 import torch.nn.functional as F
 
+from loader import CsiDataloader
 from model import DetectionNetModel
 from utils import complex2real
 
 
 class DetectionMethod(abc.ABC):
 
-    def __init__(self, constellation):
-        self.constellation = constellation
+    def __init__(self, modulation):
+        self.modulation = modulation
 
     @abc.abstractmethod
     def get_key_name(self):
@@ -27,14 +28,24 @@ class DetectionMethod(abc.ABC):
         nmse = 10 * torch.log10(nmse)
         return nmse.item()
 
-    def get_ber(self):
-        pass
+    def get_ber(self, y, h, x, x_idx, var):
+        x_hat = self.get_x_hat(y, h, x, var)
+        x_hat_r = x_hat.real
+        x_hat_i = x_hat.imag
+        constellation = torch.from_numpy(CsiDataloader.constellations[self.modulation])
+        constellation_r = constellation.real
+        constellation_i = constellation.imag
+
+        x_hat_dist = (x_hat_r - constellation_r) ** 2 + (x_hat_i - constellation_i) ** 2
+        x_hat_idx = torch.argmin(x_hat_dist, dim=-1, keepdim=True)
+        ber = (x_hat_idx != x_idx).sum() / x_idx.numel()
+        return ber.item()
 
 
 class DetectionMethodZF(DetectionMethod):
 
-    def __init__(self, constellation):
-        super().__init__(constellation)
+    def __init__(self, modulation):
+        super().__init__(modulation)
 
     def get_key_name(self):
         return 'ZF'
@@ -46,8 +57,8 @@ class DetectionMethodZF(DetectionMethod):
 
 class DetectionMethodMMSE(DetectionMethod):
 
-    def __init__(self, constellation):
-        super().__init__(constellation)
+    def __init__(self, modulation):
+        super().__init__(modulation)
 
     def get_key_name(self):
         return 'mmse'
@@ -60,10 +71,10 @@ class DetectionMethodMMSE(DetectionMethod):
 
 class DetectionMethodModel(DetectionMethod):
 
-    def __init__(self, model: DetectionNetModel, constellation, use_gpu):
+    def __init__(self, model: DetectionNetModel, modulation, use_gpu):
         self.model = model.eval()
         self.use_gpu = use_gpu
-        super().__init__(constellation)
+        super().__init__(modulation)
 
     def get_key_name(self):
         return self.model.__str__()
@@ -88,9 +99,9 @@ class DetectionMethodModel(DetectionMethod):
 
 class DetectionMethodConjugateGradient(DetectionMethod):
 
-    def __init__(self, constellation, iterate):
+    def __init__(self, modulation, iterate):
         self.iterate = iterate
-        super().__init__(constellation)
+        super().__init__(modulation)
 
     def get_key_name(self):
         return 'ConjugateGradient-{}th'.format(self.iterate)

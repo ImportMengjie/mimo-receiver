@@ -136,8 +136,8 @@ class CsiDataloader:
     def random_x(self, count, modulation):
         constellation_idx_mat = np.random.randint(0, CsiDataloader.constellations[modulation.lower()].shape[0],
                                                   size=(count, self.n_sc, self.n_t, 1))
-        return torch.from_numpy(
-            np.array(list(map(lambda x: CsiDataloader.constellations[modulation.lower()][x], constellation_idx_mat))))
+        return torch.from_numpy(np.array(list(map(lambda x: CsiDataloader.constellations[modulation.lower()][x],
+                                                  constellation_idx_mat)))), torch.from_numpy(constellation_idx_mat)
 
     @USE_GPU
     def get_pilot_x(self, n_t=None):

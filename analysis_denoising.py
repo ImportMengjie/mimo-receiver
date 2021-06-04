@@ -14,6 +14,7 @@ from utils import DenoisingMethodModel
 import utils.config as config
 
 use_gpu = True and config.USE_GPU
+config.USE_GPU = use_gpu
 
 
 def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: List[DenoisingMethod], snr_start, snr_end,

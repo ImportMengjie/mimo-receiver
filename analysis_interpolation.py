@@ -11,6 +11,7 @@ from utils import draw_line
 import utils.config as config
 
 use_gpu = True and config.USE_GPU
+config.USE_GPU = use_gpu
 
 
 def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_list: List[InterpolationMethod],

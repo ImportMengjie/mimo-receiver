@@ -58,6 +58,8 @@ class DenoisingMethodModel(DenoisingMethod):
         self.model = self.model.eval()
         self.model.double()
         self.use_gpu = use_gpu and config.USE_GPU
+        if self.use_gpu:
+            self.model = self.model.cuda()
 
     def get_key_name(self):
         return self.model.__str__()

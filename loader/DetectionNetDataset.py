@@ -15,7 +15,7 @@ class DetectionNetDataset(BaseDataset):
         self.csiDataloader = csiDataloader
         self.modulation = modulation
         self.dataType = dataType
-        self.x = csiDataloader.get_x(dataType, modulation)
+        self.x, _ = csiDataloader.get_x(dataType, modulation)
         self.hx = self.h @ self.x
         self.n, self.var = csiDataloader.noise_snr_range(self.hx, snr_range, True)
         self.y = self.hx + self.n

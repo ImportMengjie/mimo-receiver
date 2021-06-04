@@ -15,13 +15,14 @@ from utils import draw_line
 import utils.config as config
 
 use_gpu = True and config.USE_GPU
+config.USE_GPU = use_gpu
 
 
 def analysis_detection_nmse(csi_dataloader: CsiDataloader, detection_method_list: List[DetectionMethod], snr_start,
                             snr_end,
                             snr_step=1, modulation='bpsk', dataType=DataType.test):
     nmse_list = [[] for _ in range(len(detection_method_list))]
-    x = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
+    x, _ = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
     h = csi_dataloader.get_h(dataType)
     hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
@@ -36,9 +37,29 @@ def analysis_detection_nmse(csi_dataloader: CsiDataloader, detection_method_list
     return nmse_k_v, list(range(snr_start, snr_end, snr_step))
 
 
+def analysis_detection_ber(csi_dataloader: CsiDataloader, detection_method_list: List[DetectionMethod], snr_start,
+                           snr_end,
+                           snr_step=1, modulation='bpsk', dataType=DataType.test):
+    ber_list = [[] for _ in range(len(detection_method_list))]
+    x, x_idx = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
+    h = csi_dataloader.get_h(dataType)
+    hx = h @ x
+    for snr in range(snr_start, snr_end, snr_step):
+        n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=True)
+        y = hx + n
+        detection_method_list[0].get_ber(y, h, x, x_idx, var)
+        for i in range(0, len(detection_method_list)):
+            ber = detection_method_list[i].get_ber(y, h, x, x_idx, var)
+            ber_list[i].append(ber)
+    ber_k_v = {}
+    for i in range(len(ber_list)):
+        ber_k_v[detection_method_list[i].get_key_name()] = ber_list[i]
+    return ber_k_v, list(range(snr_start, snr_end, snr_step))
+
+
 def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [DetectionNetModel], fix_snr=30,
                              modulation='bpsk', dataType=DataType.test):
-    x = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
+    x, _ = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
     h = csi_dataloader.get_h(dataType)
     hx = h @ x
     n, var = csi_dataloader.noise_snr_range(hx, [fix_snr, fix_snr + 1], one_col=True)
@@ -101,8 +122,11 @@ if __name__ == '__main__':
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t * 2)]
     # detection_methods = [DetectionMethodModel(model, constellation)]
 
-    # nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 5, 100, modulation=constellation)
-    # draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))
+    nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 0, 40, 2, modulation=modulation)
+    draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))
 
-    nmse_dict, iter_list = analysis_detection_layer(csi_dataloader, [model], 30, 'bpsk')
-    draw_line(iter_list, nmse_dict, title='Detection-{}-iter'.format(csi_dataloader), xlabel='iter/layer', save_dir=config.DETECTION_RESULT_IMG)
+    ber_dict, x = analysis_detection_ber(csi_dataloader, detection_methods, 0, 20, 2, modulation=modulation)
+    draw_line(x, ber_dict, title='Detection-{}'.format(csi_dataloader.__str__()), ylabel='ber')
+    # nmse_dict, iter_list = analysis_detection_layer(csi_dataloader, [model], 30, 'bpsk')
+    # draw_line(iter_list, nmse_dict, title='Detection-{}-iter'.format(csi_dataloader), xlabel='iter/layer',
+    #           save_dir=config.DETECTION_RESULT_IMG)
