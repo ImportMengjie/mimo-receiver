@@ -70,6 +70,12 @@ def get_interpolation_pilot_idx(n_sc: int, pilot_count: int):
     return pilot_idx
 
 
+def to_cuda(mat: torch.Tensor):
+    if not mat.is_cuda:
+        return mat.cuda()
+    return mat
+
+
 if __name__ == '__main__':
     h = torch.arange(0, 64).reshape(-1, 1, 1) * torch.ones(8, 8)
     h = h.reshape(1, -1, 8, 8).repeat(10, 1, 1, 1)

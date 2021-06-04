@@ -13,3 +13,6 @@ class BaseNetModel(nn.Module):
 
     def get_train_state(self):
         return {}
+
+    def basename(self):
+        return 'base'

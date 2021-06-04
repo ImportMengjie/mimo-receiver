@@ -1,9 +1,12 @@
 import abc
+from loader.CsiDataloader import CsiDataloader
 import torch
 
 from model import DenoisingNetModel
 from utils import complex2real
 from utils import conj_t
+
+import utils.config as config
 
 
 class DenoisingMethod(abc.ABC):
@@ -43,8 +46,6 @@ class DenoisingMethodMMSE(DenoisingMethod):
         n_r = y.shape[-2]
         n_t = x.shape[-2]
         I = torch.eye(n_t, n_t)
-        if torch.cuda.is_available():
-            I = I.cuda()
         h_hat = y @ torch.inverse(conj_t(x) @ r_h @ x + n_r * var * I) @ conj_t(
             x) @ r_h
         return h_hat
@@ -52,10 +53,11 @@ class DenoisingMethodMMSE(DenoisingMethod):
 
 class DenoisingMethodModel(DenoisingMethod):
 
-    def __init__(self, model: DenoisingNetModel):
+    def __init__(self, model: DenoisingNetModel, use_gpu=True):
         self.model = model
         self.model = self.model.eval()
         self.model.double()
+        self.use_gpu = use_gpu and config.USE_GPU
 
     def get_key_name(self):
         return self.model.__str__()
@@ -64,7 +66,11 @@ class DenoisingMethodModel(DenoisingMethod):
         h_ls = y @ torch.inverse(x)
         h_ls = h_ls.reshape(-1, *h_ls.shape[-2:])
         h_ls = complex2real(h_ls)
+        if self.use_gpu:
+            h_ls = h_ls.cuda()
         h_hat, _ = self.model(h_ls)
         h_hat = h_hat.reshape(h.shape + (2,))
         h_hat = h_hat[:, :, :, :, 0] + h_hat[:, :, :, :, 1] * 1j
+        if h_hat.is_cuda:
+            h_hat = h_hat.cpu()
         return h_hat

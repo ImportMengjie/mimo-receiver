@@ -60,8 +60,9 @@ class DetectionMethodMMSE(DetectionMethod):
 
 class DetectionMethodModel(DetectionMethod):
 
-    def __init__(self, model: DetectionNetModel, constellation):
+    def __init__(self, model: DetectionNetModel, constellation, use_gpu):
         self.model = model.eval()
+        self.use_gpu = use_gpu
         super().__init__(constellation)
 
     def get_key_name(self):
@@ -75,9 +76,13 @@ class DetectionMethodModel(DetectionMethod):
         A_left = torch.cat((A.real, A.imag), 2)
         A_right = torch.cat((-A.imag, A.real), 2)
         A = torch.cat((A_left, A_right), 3)
-
+        if self.use_gpu:
+            A = A.cuda()
+            b = b.cuda()
         x_hat, = self.model(A, b)  # reshape???
         x_hat = x_hat[:, :, 0:x.shape[-2], :] + x_hat[:, :, x.shape[-2]:, :] * 1j
+        if x_hat.is_cuda:
+            x_hat = x_hat.cpu()
         return x_hat
 
 
@@ -88,7 +93,7 @@ class DetectionMethodConjugateGradient(DetectionMethod):
         super().__init__(constellation)
 
     def get_key_name(self):
-        return 'ConjugateGradient-{}'.format(self.iterate)
+        return 'ConjugateGradient-{}th'.format(self.iterate)
 
     def get_key_name_short(self):
         return 'ConjugateGradient'

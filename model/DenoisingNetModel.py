@@ -9,6 +9,8 @@ from loader import DenoisingNetDataset
 from model import Tee
 from model import BaseNetModel
 
+import utils.config as config
+
 
 class Padding(nn.Module):
 
@@ -18,7 +20,7 @@ class Padding(nn.Module):
 
     def forward(self, x):
         zeros = torch.zeros(x.shape[:-1] + (self.kernel_size - 1,))
-        if torch.cuda.is_available():
+        if config.USE_GPU:
             zeros = zeros.cuda()
         return torch.cat((x[:, :, :, :x.shape[-1] // 2], zeros, x[:, :, :, x.shape[-1] // 2:]), -1)
 
@@ -136,6 +138,9 @@ class DenoisingNetModel(BaseNetModel):
                                                                 self.n_r, self.n_t,
                                                                 self.noise_level_conv_num, self.denosing_conv_num,
                                                                 self.channel_num)
+
+    def basename(self):
+        return 'denoising'
 
 
 class DenoisingNetLoss(nn.Module):

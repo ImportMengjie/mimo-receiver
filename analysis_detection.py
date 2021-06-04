@@ -2,15 +2,19 @@ import os
 from typing import List
 import torch
 
-from loader import CsiDataloader, DataType
-from model import DetectionNetModel
-from train import Train
+from loader import CsiDataloader, DataType, DetectionNetDataset
+from model import DetectionNetModel, DetectionNetLoss, DetectionNetTee
+from train import Train, TrainParam
 from utils import DetectionMethod
 from utils import DetectionMethodZF
 from utils import DetectionMethodMMSE
 from utils import DetectionMethodModel
 from utils import DetectionMethodConjugateGradient
 from utils import draw_line
+
+import utils.config as config
+
+use_gpu = True and config.USE_GPU
 
 
 def analysis_detection_nmse(csi_dataloader: CsiDataloader, detection_method_list: List[DetectionMethod], snr_start,
@@ -22,7 +26,6 @@ def analysis_detection_nmse(csi_dataloader: CsiDataloader, detection_method_list
     hx = h @ x
     for snr in range(snr_start, snr_end, snr_step):
         n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=True)
-
         y = hx + n
         for i in range(0, len(detection_method_list)):
             nmse = detection_method_list[i].get_nmse(y, h, x, var)
@@ -40,15 +43,25 @@ def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [Detecti
     hx = h @ x
     n, var = csi_dataloader.noise_snr_range(hx, [fix_snr, fix_snr + 1], one_col=True)
     y = hx + n
-    model_method_list = [DetectionMethodModel(model, modulation) for model in model_list]
+
+    param = TrainParam()
+    param.epochs = 100
+    criterion = DetectionNetLoss()
+    dataset = DetectionNetDataset(csi_dataloader, dataType, [fix_snr, fix_snr + 1], modulation)
+    train_list = [
+        Train(param, dataset, model.cuda() if config.USE_GPU else model, criterion, DetectionNetTee, dataset) for
+        model in model_list]
+
+    model_method_list = [DetectionMethodModel(model, modulation, use_gpu) for model in model_list]
     nmse_k_v = {}
     mmse_method = DetectionMethodMMSE(modulation)
     cj_method = DetectionMethodConjugateGradient(modulation, 1)
     iter_list = []
-    for layer in range(1, csi_dataloader.n_t*2+1):
+    for layer in range(1, csi_dataloader.n_t * 2 + 1):
         iter_list.append(layer)
-        for method in model_method_list:
-            method.model.set_test_layer(layer)
+        for method, train in zip(model_method_list, train_list):
+            method.model.set_training_layer(layer, False)
+            train.train(save=False, reload=False, ext_log='model:{},layer:{}'.format(method.model, layer))
             nmse = method.get_nmse(y, h, x, var)
             nmses = nmse_k_v.get(method.get_key_name(), [])
             nmses.append(nmse)
@@ -72,24 +85,24 @@ if __name__ == '__main__':
 
     csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=10000)
     layer = csi_dataloader.n_t * 2
-    constellation = 'bpsk'
-    model = DetectionNetModel(csi_dataloader, layer, True, modulation=constellation)
-    save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
+    modulation = 'bpsk'
+    model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation)
+    save_model_path = Train.get_save_path_from_model(model)
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {} file'.format(save_model_path))
-    detection_methods = [DetectionMethodZF(constellation), DetectionMethodMMSE(constellation),
-                         DetectionMethodModel(model, constellation)]
+    detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),
+                         DetectionMethodModel(model, modulation, use_gpu)]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
-    # detection_methods = [DetectionMethodMMSE(constellation), DetectionMethodModel(model, constellation),
+    # detection_methods = [DetectionMethodMMSE(constellation), #DetectionMethodModel(model, constellation),
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t),
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t * 2)]
     # detection_methods = [DetectionMethodModel(model, constellation)]
 
-    nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 5, 30, modulation=constellation)
-    draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))
+    # nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, 5, 100, modulation=constellation)
+    # draw_line(x, nmse_dict, title='Detection-{}'.format(csi_dataloader.__str__()))
 
     nmse_dict, iter_list = analysis_detection_layer(csi_dataloader, [model], 30, 'bpsk')
-    draw_line(iter_list, nmse_dict, title='Detection-{}-iter'.format(csi_dataloader), xlabel='iter')
+    draw_line(iter_list, nmse_dict, title='Detection-{}-iter'.format(csi_dataloader), xlabel='iter/layer', save_dir=config.DETECTION_RESULT_IMG)

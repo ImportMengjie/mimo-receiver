@@ -23,6 +23,7 @@ from model import InterpolationNetModel
 from model import InterpolationNetTee
 from model import Tee
 from utils import AvgLoss
+import utils.config as config
 
 
 # from torchsummary import summary
@@ -33,7 +34,6 @@ class TrainParam:
     lr: float = 0.001
     epochs: int = 10000
     momentum: float = 0.9
-    use_gpu: bool = True
     batch_size: int = 64
     use_scheduler: bool = True
     stop_when_test_loss_down_epoch_count = 20
@@ -50,16 +50,17 @@ class Train:
         self.criterion = criterion
         self.teeClass = teeClass
         self.losses = []
-        if self.param.use_gpu and torch.cuda.is_available():
+        if config.USE_GPU:
             self.model = self.model.cuda()
             self.criterion = self.criterion.cuda()
-            dataset.cuda()
+            # dataset.cuda()
+            # test_dataset.cuda()
         self.dataset = dataset
         self.dataloader = DataLoader(dataset, param.batch_size, True)
         self.test_dataset = test_dataset
         self.test_dataloader = None
         if self.test_dataset:
-            self.test_dataloader = DataLoader(self.test_dataset, len(self.test_dataset))
+            self.test_dataloader = DataLoader(self.test_dataset, param.batch_size)
 
     def get_save_path(self):
         return Train.get_save_path_from_model(self.model)
@@ -91,8 +92,9 @@ class Train:
         self.model.double()
         # logging.info('model:')
         # summary(self.model)
+        avg_loss = AvgLoss()
+        test_avg_loss = AvgLoss()
         while True:
-            avg_loss = AvgLoss()
             for items in self.dataloader:
                 tee = self.teeClass(items)
                 tee.set_model_output(self.model(*tee.get_model_input()))
@@ -107,12 +109,14 @@ class Train:
                 logging.info(
                     'epoch:{} avg_loss:{};{}'.format(current_epoch, self.losses[-1], ext_log))
             if self.test_dataloader and current_epoch % self.param.stop_when_test_loss_down_epoch_count == 0 and current_epoch >= self.param.epochs:
-                items = list(self.test_dataloader)[0]
-                tee = self.teeClass(items)
-                tee.set_model_output(self.model.eval()(*tee.get_model_input()))
-                loss = self.criterion(*tee.get_loss_input())
-                test_loss.append(loss.item())
-                logging.warning('test loss:{} in epoch:{}'.format(loss, current_epoch))
+                for items in self.test_dataloader:
+                    tee = self.teeClass(items)
+                    tee.set_model_output(self.model.eval()(*tee.get_model_input()))
+                    loss = self.criterion(*tee.get_loss_input())
+                    test_avg_loss.add(loss.item())
+                test_loss.append(test_avg_loss.avg)
+                test_avg_loss.reset()
+                logging.warning('test loss:{} in epoch:{}'.format(test_loss[-1], current_epoch))
                 if len(test_loss) > 1 and test_loss[-1] > test_loss[-2]:
                     logging.error('test loss down [-2]{}, [-1]{}'.format(test_loss[-2], test_loss[-1]))
                     break
@@ -133,7 +137,7 @@ class Train:
 
     @staticmethod
     def get_save_path_from_model(model: BaseNetModel):
-        return os.path.join(Train.save_dir, '{}.pth.tar'.format(str(model)))
+        return os.path.join(Train.save_dir, model.basename(), '{}.pth.tar'.format(str(model)))
 
 
 def train_denoising_net(data_path: str, snr_range: list, ):
@@ -317,4 +321,4 @@ if __name__ == '__main__':
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
-    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60],  modulation='bpsk', retrain=True)
+    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60], modulation='bpsk', retrain=True)

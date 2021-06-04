@@ -51,6 +51,9 @@ class InterpolationNetModel(BaseNetModel):
                                                              self.n_t, self.n_sc,
                                                              self.pilot_count, self.num_conv_block, self.channel_num)
 
+    def basename(self):
+        return 'interpolation'
+
 
 class InterpolationNetLoss(nn.Module):
 

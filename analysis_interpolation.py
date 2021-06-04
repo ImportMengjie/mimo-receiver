@@ -8,6 +8,9 @@ from model import InterpolationNetModel
 from train import Train
 from utils import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel
 from utils import draw_line
+import utils.config as config
+
+use_gpu = True and config.USE_GPU
 
 
 def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_list: List[InterpolationMethod],
@@ -34,15 +37,15 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/3gpp_16_16_64_5_5.mat')
     model = InterpolationNetModel(csi_dataloader, 4)
-    save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
+    save_model_path = Train.get_save_path_from_model(model)
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path)
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {} model'.format(save_model_path))
     interpolation_methods = [InterpolationMethodLine(csi_dataloader.n_sc, model.pilot_count),
-                             InterpolationMethodModel(model)]
+                             InterpolationMethodModel(model, use_gpu)]
 
     nmse_dict, x = analysis_interpolation(csi_dataloader, interpolation_methods, 150, 200, 10)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
-    draw_line(x, nmse_dict, title='interpolation-{}'.format(csi_dataloader.__str__()))
+    draw_line(x, nmse_dict, title='interpolation-{}'.format(csi_dataloader.__str__()), save_dir=config.INTERPOLATION_RESULT_IMG)

@@ -9,6 +9,8 @@ from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
 
+import utils.config as config
+
 
 class Lcg(nn.Module):
 
@@ -76,7 +78,7 @@ class DetectionNetModel(BaseNetModel):
 
     def forward(self, A, b):
         s = torch.zeros(b.shape)
-        if torch.cuda.is_available():
+        if config.USE_GPU:
             s = s.cuda()
         r = b
         d = r
@@ -88,6 +90,9 @@ class DetectionNetModel(BaseNetModel):
         return '{}-{}_r{}t{}_v{}num{}m{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
                                                  self.vector,
                                                  self.layer_nums, self.modulation)
+
+    def basename(self):
+        return 'detection'
 
     def get_train_state_str(self):
         return 'train layer:{}/{},fix forward:{}'.format(self.training_layer, self.layer_nums, self.fix_forward_layer)

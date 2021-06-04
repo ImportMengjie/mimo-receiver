@@ -4,6 +4,9 @@ from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
 
+import utils.config as config
+from utils import to_cuda
+
 
 class DetectionNetDataset(BaseDataset):
 
@@ -17,8 +20,6 @@ class DetectionNetDataset(BaseDataset):
         self.n, self.var = csiDataloader.noise_snr_range(self.hx, snr_range, True)
         self.y = self.hx + self.n
         I = torch.eye(csiDataloader.n_t, csiDataloader.n_t)
-        if torch.cuda.is_available():
-            I = I.cuda()
         self.A = self.h.conj().transpose(-1, -2) @ self.h + self.var * I
         self.b = self.h.conj().transpose(-1, -2) @ self.y
 
@@ -43,6 +44,10 @@ class DetectionNetDataset(BaseDataset):
         A = self.A[idx, n_sc_idx]
         b = self.b[idx, n_sc_idx]
         x = self.x[idx, n_sc_idx]
+        if config.USE_GPU:
+            A = to_cuda(A)
+            b = to_cuda(b)
+            x = to_cuda(x)
         return A, b, x
 
 

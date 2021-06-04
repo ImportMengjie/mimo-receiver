@@ -4,6 +4,8 @@ from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
 from utils import complex2real
+from utils import to_cuda
+import utils.config as config
 
 
 class DenoisingNetDataset(BaseDataset):
@@ -15,10 +17,7 @@ class DenoisingNetDataset(BaseDataset):
         self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
         self.sigma = self.sigma**0.5
         self.y = hx + self.n
-        if torch.cuda.is_available():
-            x_p_inv = torch.inverse(self.x_p.cpu()).cuda()
-        else:
-            x_p_inv = torch.inverse(self.x_p)
+        x_p_inv = torch.inverse(self.x_p)
         self.h_ls = self.y @ x_p_inv
         self.in_cuda = False
 
@@ -38,6 +37,10 @@ class DenoisingNetDataset(BaseDataset):
         h = complex2real(self.h[idx, n_sc_idx])
         h_ls = complex2real(self.h_ls[idx, n_sc_idx])
         sigma = self.sigma[idx, 0, 0, 0]
+        if config.USE_GPU:
+            h_ls = to_cuda(h_ls)
+            h = to_cuda(h)
+            sigma = to_cuda(sigma)
         return h_ls, h, sigma
 
 

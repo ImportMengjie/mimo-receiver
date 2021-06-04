@@ -11,6 +11,10 @@ from utils import DenoisingMethodLS
 from utils import DenoisingMethodMMSE
 from utils import DenoisingMethodModel
 
+import utils.config as config
+
+use_gpu = True and config.USE_GPU
+
 
 def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: List[DenoisingMethod], snr_start, snr_end,
                        snr_step=1):
@@ -32,20 +36,19 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 if __name__ == '__main__':
     import logging
+
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    csi_dataloader = CsiDataloader('data/normal_3gpp_16_16_64_5_5.mat', train_data_radio=0, factor=1)
+    csi_dataloader = CsiDataloader('data/3gpp_16_16_64_100_10.mat', train_data_radio=0.9, factor=1)
     model = DenoisingNetModel(csi_dataloader)
-    save_model_path = os.path.join(Train.save_dir, model.__str__() + ".pth.tar")
+    save_model_path = Train.get_save_path_from_model(model)
     if os.path.exists(save_model_path):
-        model_info = torch.load(save_model_path)
+        model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {}'.format(save_model_path))
-    if torch.cuda.is_available():
-        model = model.cuda()
-    # detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model)]
-    detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
+    detection_methods = [DenoisingMethodLS(), DenoisingMethodMMSE(), DenoisingMethodModel(model, use_gpu)]
+    # detection_methods = [DenoisingMethodMMSE(), DenoisingMethodLS()]
 
-    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 2, 60, 2)
+    nmse_dict, x = analysis_denoising(csi_dataloader, detection_methods, 2, 80, 10)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
-    draw_line(x, nmse_dict, title='denoising-{}'.format(csi_dataloader.__str__()))
+    draw_line(x, nmse_dict, title='denoising-{}'.format(csi_dataloader.__str__()), save_dir=config.DENOISING_RESULT_IMG)

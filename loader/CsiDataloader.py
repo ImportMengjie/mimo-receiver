@@ -19,11 +19,6 @@ class ChannelType(Enum):
     unknown = 3
 
 
-use_gpu = True
-
-use_gpu = torch.cuda.is_available() and use_gpu
-
-
 def toNp(tensor: torch.Tensor):
     return tensor.cpu().detach().numpy()
 
@@ -31,7 +26,7 @@ def toNp(tensor: torch.Tensor):
 def USE_GPU(func):
     def wrapper(*args, **kwargs):
         ret = func(*args, **kwargs)
-        if use_gpu:
+        if CsiDataloader.use_gpu:
             if isinstance(ret, Iterable):
                 gpu_ret = []
                 for r in ret:
@@ -54,6 +49,9 @@ class CsiDataloader:
              complex(1 / np.sqrt(2.), -1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), -1 / np.sqrt(2.))]),
         'bpsk': np.array([complex(1, 0), complex(-1, 0)])
     }
+    use_gpu = False
+
+    use_gpu = torch.cuda.is_available() and use_gpu
 
     @staticmethod
     def complex2real(h_mtx):
@@ -91,7 +89,7 @@ class CsiDataloader:
         files.close()
 
         data = torch.from_numpy(data)
-        if use_gpu:
+        if CsiDataloader.use_gpu:
             data = data.cuda()
         data = data.repeat((self.factor, 1, 1, 1))
         self.J = data.shape[0]

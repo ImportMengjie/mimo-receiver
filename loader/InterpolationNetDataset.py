@@ -8,6 +8,8 @@ from utils import DenoisingMethod
 from utils import complex2real
 from utils import get_interpolation_pilot_idx
 from utils import line_interpolation_hp_pilot
+from utils import to_cuda
+import utils.config as config
 
 
 class InterpolationNetDataset(BaseDataset):
@@ -56,6 +58,9 @@ class InterpolationNetDataset(BaseDataset):
 
         h = h.permute(2, 0, 1)
         H = H.permute(2, 0, 1)
+        if config.USE_GPU:
+            h = to_cuda(h)
+            H = to_cuda(H)
         return h, H
 
 
