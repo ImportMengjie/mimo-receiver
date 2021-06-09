@@ -16,7 +16,8 @@ class DataType(Enum):
 class ChannelType(Enum):
     gaussian = 1
     gpp = 2
-    unknown = 3
+    spatial = 3
+    unknown = 4
 
 
 def toNp(tensor: torch.Tensor):
