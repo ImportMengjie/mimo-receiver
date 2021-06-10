@@ -5,8 +5,8 @@ def get_steering_vector(n_v, n_h, azimuth, elevation, lambda_):
     d = lambda_ / 2
     n_v_v = np.arange(0, n_v).reshape((-1, 1))
     n_h_v = np.arange(0, n_h).reshape((-1, 1))
-    azimuth_v = np.e ** (n_v_v * -1j * 2 * np.pi * d * np.sin(azimuth) * np.sin(elevation) / lambda_)
-    elevation_v = np.e ** (n_h_v * -1j * 2 * np.pi * d * np.cos(elevation) / lambda_)
+    azimuth_v = np.e ** (n_v_v * 1j * 2 * np.pi * d * np.sin(azimuth) * np.sin(elevation) / lambda_)
+    elevation_v = np.e ** (n_h_v * 1j * 2 * np.pi * d * np.cos(elevation) / lambda_)
     # steering_v = np.kron(azimuth_v, elevation_v) / np.sqrt(n_v * n_h)
     steering_v = np.concatenate(
         [np.kron(azimuth_v[i], elevation_v[i]).reshape((1, -1, 1)) for i in range(azimuth_v.shape[0])], 0)

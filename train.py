@@ -317,8 +317,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    # train_denoising_net('data/3gpp_16_16_64_5_5.mat', [5, 100])
+    train_denoising_net('data/spatial_16_16_64_100.mat', [5, 100])
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
-    train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60], modulation='bpsk', retrain=True)
+    # train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60], modulation='bpsk', retrain=True)

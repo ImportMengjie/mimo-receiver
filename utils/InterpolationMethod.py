@@ -45,7 +45,7 @@ class InterpolationMethodLine(InterpolationMethod):
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
-            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var)
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, None)
         H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
         return H_hat
 

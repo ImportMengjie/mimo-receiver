@@ -30,7 +30,7 @@ class InterpolationNetDataset(BaseDataset):
         self.h_p = self.h[:, self.pilot_idx, :, :]
         self.y = self.h_p @ self.xp + self.n
         if denoisingMethod is not None:
-            self.h_p = denoisingMethod.get_h_hat(self.y, self.h_p, self.xp, self.sigma**2)
+            self.h_p = denoisingMethod.get_h_hat(self.y, self.h_p, self.xp, self.sigma ** 2, None)
         self.h_interpolation = None
         if self.interpolation:
             self.h_interpolation = line_interpolation_hp_pilot(self.h_p, self.pilot_idx, csiDataloader.n_sc)

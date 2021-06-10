@@ -123,9 +123,9 @@ class DenoisingNetModel(BaseNetModel):
         self.noise_level = NoiseLevelEstimationModel(self.n_r, self.n_t, noise_level_conv_num, channel_num, kernel_size)
         self.denosing = NonBlindDenosingModel(self.n_r, self.n_t, denosing_conv_num, channel_num, kernel_size)
 
-    def forward(self, x):
+    def forward(self, x, sigma):
         x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
-        sigma = self.noise_level(x)
+        # sigma = self.noise_level(x)
         sigma_map = sigma.unsqueeze(-1).repeat(1, self.n_r, 2 * self.n_t).unsqueeze(1)
         concat_x = torch.cat([sigma_map, x], dim=1)
         noise = self.denosing(concat_x)
@@ -154,6 +154,10 @@ class DenoisingNetLoss(nn.Module):
         asym_loss = torch.mean(
             torch.abs(self.a - F.relu(sigma - sigma_hat)) * torch.pow(sigma - sigma_hat, 2))
         # asym_loss = F.mse_loss(sigma_map, sigma_map_hat)
+        # if not torch.isnan(sigma_hat[0]):
+        #     asym_loss = torch.mean((h_hat-h)**2/sigma_hat)
+        # else:
+        #     asym_loss = 0
         loss = l2_h_loss + 0.5 * asym_loss
         return loss
 
@@ -163,10 +167,11 @@ class DenoisingNetTee(Tee):
     def __init__(self, items):
         super().__init__(items)
         self.h_ls, self.h, self.sigma = items
+        self.sigma = self.sigma.reshape(-1, 1)
         self.h_hat, self.sigma_hat = None, None
 
     def get_model_input(self):
-        return self.h_ls,
+        return self.h_ls, self.sigma
 
     def set_model_output(self, outputs):
         self.h_hat, self.sigma_hat = outputs
