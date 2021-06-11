@@ -152,6 +152,8 @@ class DenoisingNetLoss(nn.Module):
         self.a = a
 
     def forward(self, h, h_hat, sigma, sigma_hat):
+        sigma = sigma.squeeze()
+        sigma_hat = sigma_hat.squeeze()
         l2_h_loss = F.mse_loss(h_hat, h)
         asym_loss = torch.mean(
             torch.abs(self.a - F.relu(sigma - sigma_hat)) * torch.pow(sigma - sigma_hat, 2))

@@ -15,7 +15,7 @@ class DenoisingNetDataset(BaseDataset):
         self.x_p = csiDataloader.get_pilot_x()
         hx = self.h @ self.x_p
         self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
-        self.sigma = self.sigma**0.5
+        self.sigma = (self.sigma / 2) ** 0.5
         self.y = hx + self.n
         x_p_inv = torch.inverse(self.x_p)
         self.h_ls = self.y @ x_p_inv

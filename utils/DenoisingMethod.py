@@ -72,7 +72,7 @@ class DenoisingMethodModel(DenoisingMethod):
         if self.use_gpu:
             h_ls = h_ls.cuda()
             var = var.cuda()
-        h_hat, _ = self.model(h_ls, var**0.5)
+        h_hat, _ = self.model(h_ls, (var / 2) ** 0.5)
         h_hat = h_hat.reshape(h.shape + (2,))
         h_hat = h_hat[:, :, :, :, 0] + h_hat[:, :, :, :, 1] * 1j
         if h_hat.is_cuda:
