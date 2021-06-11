@@ -65,10 +65,13 @@ class DenoisingMethodModel(DenoisingMethod):
 
     def get_h_hat(self, y, h, x, var, rhh):
         h_ls = y @ torch.inverse(x)
+        n_sc = h_ls.shape[1]
         h_ls = h_ls.reshape(-1, *h_ls.shape[-2:])
         h_ls = complex2real(h_ls)
+        var = var.repeat(1, n_sc, 1, 1).reshape(-1, 1)
         if self.use_gpu:
             h_ls = h_ls.cuda()
+            var = var.cuda()
         h_hat, _ = self.model(h_ls, var**0.5)
         h_hat = h_hat.reshape(h.shape + (2,))
         h_hat = h_hat[:, :, :, :, 0] + h_hat[:, :, :, :, 1] * 1j

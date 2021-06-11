@@ -111,8 +111,9 @@ class NonBlindDenosingModel(nn.Module):
 class DenoisingNetModel(BaseNetModel):
 
     def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32,
-                 kernel_size=(3, 3)):
+                 kernel_size=(3, 3), use_noise_level=True):
         super(DenoisingNetModel, self).__init__(csiDataloader)
+        self.use_noise_level = use_noise_level
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
         self.noise_level_conv_num = noise_level_conv_num
@@ -125,7 +126,8 @@ class DenoisingNetModel(BaseNetModel):
 
     def forward(self, x, sigma):
         x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
-        # sigma = self.noise_level(x)
+        if self.use_noise_level:
+            sigma = self.noise_level(x)
         sigma_map = sigma.unsqueeze(-1).repeat(1, self.n_r, 2 * self.n_t).unsqueeze(1)
         concat_x = torch.cat([sigma_map, x], dim=1)
         noise = self.denosing(concat_x)
