@@ -13,18 +13,15 @@ class DenoisingNetDataset(BaseDataset):
     def __init__(self, csiDataloader: CsiDataloader, datatype: DataType, snr_range: list):
         super().__init__(csiDataloader, datatype, snr_range)
         self.x_p = csiDataloader.get_pilot_x()
-        hx = self.h @ self.x_p
-        self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
+        self.hx = self.h @ self.x_p
+        self.sigma = csiDataloader.get_var_from_snr(self.hx, snr_range)
         self.sigma = (self.sigma / 2) ** 0.5
-        self.y = hx + self.n
-        x_p_inv = torch.inverse(self.x_p)
-        self.h_ls = self.y @ x_p_inv
+        self.x_p_inv = torch.inverse(self.x_p)
         self.in_cuda = False
 
     def cuda(self):
         if torch.cuda.is_available():
             self.in_cuda = True
-            self.h_ls = self.h_ls.cuda()
             self.h = self.h.cuda()
             self.sigma = self.sigma.cuda()
 
@@ -35,8 +32,10 @@ class DenoisingNetDataset(BaseDataset):
         n_sc_idx = item % self.csiDataloader.n_sc
         idx = item // self.csiDataloader.n_sc
         h = complex2real(self.h[idx, n_sc_idx])
-        h_ls = complex2real(self.h_ls[idx, n_sc_idx])
         sigma = self.sigma[idx, 0, 0, 0]
+        n = self.csiDataloader.get_noise_from_half_sigma(sigma, False)
+        y = self.hx[idx, n_sc_idx] + n
+        h_ls = complex2real(y @ self.x_p_inv)
         if config.USE_GPU:
             h_ls = to_cuda(h_ls)
             h = to_cuda(h)
