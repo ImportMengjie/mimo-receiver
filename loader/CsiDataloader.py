@@ -111,21 +111,33 @@ class CsiDataloader:
     @USE_GPU
     def noise_snr_range(self, hx: torch.Tensor, snr_range: list, one_col=False):
         count = hx.shape[0]
-        hx = hx.cpu()
-        snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
-        if self.channel_type == ChannelType.gpp:
-            hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
-            noise_var = hx_mean * (10 ** (-snrs / 10.))
-        else:
-            noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
         n_t = 1 if one_col else self.n_t
-        noise_var = noise_var.reshape(noise_var.shape + (1, 1))
+        noise_var = self.get_var_from_snr(hx, snr_range)
         noise_real = torch.from_numpy(
             np.random.normal(0, np.sqrt(toNp(noise_var) / 2.), [count, self.n_sc, self.n_r, n_t]))
         noise_imag = torch.from_numpy(
             np.random.normal(0, np.sqrt(toNp(noise_var) / 2.), [count, self.n_sc, self.n_r, n_t]))
         noise_mat = noise_real + 1j * noise_imag
         return noise_mat, noise_var
+
+    def get_var_from_snr(self, hx: torch.Tensor, snr_range: list):
+        count = hx.shape[0]
+        if hx.is_cuda:
+            hx = hx.cpu()
+        snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
+        if self.channel_type == ChannelType.gpp:
+            hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+            noise_var = hx_mean * (10 ** (-snrs / 10.))
+        else:
+            noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)
+        noise_var = noise_var.reshape(noise_var.shape + (1, 1))
+        return noise_var
+
+    def get_noise_from_half_sigma(self, half_sigma: torch.Tensor, one_col=False):
+        n_t = 1 if one_col else self.n_t
+        noise_real = torch.from_numpy(np.random.normal(0, toNp(half_sigma), [self.n_r, n_t]))
+        noise_img = torch.from_numpy(np.random.normal(0, toNp(half_sigma), [self.n_r, n_t]))
+        return noise_real + 1j * noise_img
 
     def train_X(self, modulation):
         return self.random_x(self.train_H.shape[0], modulation)
