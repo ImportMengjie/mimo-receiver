@@ -1,4 +1,4 @@
-function h = channel_generator(n_r, n_t, n_sc, timeslots)
+function h = channel_generator(n_r_v, n_r_h, n_t_v, n_t_h, n_sc, timeslots)
     s = qd_simulation_parameters;
     s.center_frequency = 2.4e9;
     s.sample_density = 2.1;
@@ -6,6 +6,8 @@ function h = channel_generator(n_r, n_t, n_sc, timeslots)
     s.use_absolute_delays = 1;
     LightSpeed = 299792458;
     half_wave_distance = (LightSpeed/s.center_frequency)*0.5;
+    n_r = n_r_v * n_r_h * 2;
+    n_t = n_t_v * n_t_h * 2;
 
     sc_bw = 2e4;
 
@@ -29,8 +31,8 @@ function h = channel_generator(n_r, n_t, n_sc, timeslots)
         
     l.tx_position = [0 0 25]';
 
-    l.tx_array = qd_arrayant.generate( '3gpp-3d',  1, n_t, s.center_frequency(1), 1);
-    l.rx_array = qd_arrayant.generate( '3gpp-3d',  1, n_r, s.center_frequency(1), 1);
+    l.tx_array = qd_arrayant.generate( '3gpp-3d',  n_t_v, n_t_h, s.center_frequency(1), 3, 0);
+    l.rx_array = qd_arrayant.generate( '3gpp-3d',  n_r_v, n_r_h, s.center_frequency(1), 3, 0);
 
     l.tx_array.normalize_gain;
     l.rx_array.normalize_gain;

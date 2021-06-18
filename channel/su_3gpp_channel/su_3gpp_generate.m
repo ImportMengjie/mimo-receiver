@@ -2,8 +2,14 @@
 close all
 clear all
 
-n_r = 16;
-n_t = 16;
+n_r_v = 4;
+n_r_h = 4;
+
+n_t_v = 2;
+n_t_h = 4;
+
+n_r = n_r_v * n_r_h * 2;
+n_t = n_t_v * n_t_h * 2;
 n_sc = 64;
 timeslots = 5;
 n_ts = 5;
@@ -13,7 +19,7 @@ J = timeslots*n_ts;
 H = ones(J,n_sc,n_r,n_t,2);
 
 for i=1:n_ts
-     h = permute(channel_generator(n_r,n_t,n_sc,timeslots), [1,4,2,3]);
+     h = permute(channel_generator(n_r_v,n_r_h,n_t_v,n_t_h,n_sc,timeslots), [1,4,2,3]);
      left = (i-1)*timeslots+1;
      right = i*timeslots;
      H(left:right,:,:,:,1) = real(h);
