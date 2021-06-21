@@ -1,12 +1,11 @@
 import numpy as np
 
 
-def get_steering_vector(n_v, n_h, azimuth, elevation, lambda_):
-    d = lambda_ / 2
+def get_steering_vector(n_v, n_h, azimuth, elevation, lambda_, d):
     n_v_v = np.arange(0, n_v).reshape((-1, 1))
     n_h_v = np.arange(0, n_h).reshape((-1, 1))
     azimuth_v = np.e ** (n_v_v * 1j * 2 * np.pi * d * np.sin(azimuth) * np.sin(elevation) / lambda_)
-    elevation_v = np.e ** (n_h_v * 1j * 2 * np.pi * d * np.cos(elevation) / lambda_)
+    elevation_v = np.e ** (n_h_v * 1j * 2 * np.pi * d * np.cos(elevation) * np.sin(azimuth) / lambda_)
     # steering_v = np.kron(azimuth_v, elevation_v) / np.sqrt(n_v * n_h)
     steering_v = np.concatenate(
         [np.kron(azimuth_v[i], elevation_v[i]).reshape((1, -1, 1)) for i in range(azimuth_v.shape[0])], 0)
@@ -20,7 +19,8 @@ def get_freq_h(N_r_v, N_r_h, N_t_v, N_t_h, K, L, low_freq, sc_band):
     N_t = N_t_v * N_t_h
     path_gain_var = 1
     H = np.zeros((K, N_r, N_t), dtype=np.complex_)
-    lambda_list = (low_freq + np.arange(0, K) * sc_band) / LightSpeed
+    lambda_list = LightSpeed / (low_freq + np.arange(0, K) * sc_band)
+    d = (LightSpeed/low_freq)/2
 
     angle_min = -np.pi / 3
     angle_max = np.pi / 3
@@ -34,9 +34,9 @@ def get_freq_h(N_r_v, N_r_h, N_t_v, N_t_h, K, L, low_freq, sc_band):
     path_gain = np.sort(path_gain, 0)[::-1]
     l_v = np.arange(0, L).reshape((-1, 1, 1))
     for k in range(0, K):
-        arrival = get_steering_vector(N_r_v, N_r_h, arrival_angle_azi, arrival_angle_ele, lambda_list[k])
-        departure = get_steering_vector(N_t_v, N_t_h, departure_angle_azi, departure_angle_ele, lambda_list[k])
-        gain = path_gain * arrival @ departure.swapaxes(-1, -2)
+        arrival = get_steering_vector(N_r_v, N_r_h, arrival_angle_azi, arrival_angle_ele, lambda_list[k], d)
+        departure = get_steering_vector(N_t_v, N_t_h, departure_angle_azi, departure_angle_ele, lambda_list[k], d)
+        gain = path_gain * arrival @ departure.conj().swapaxes(-1, -2)
         W_k_l = np.e ** (-1j * 2 * np.pi * l_v * k / K)
         H[k] = np.sqrt(N_r * N_t / L) * (W_k_l * gain).sum(0, keepdims=True)
     return H
@@ -63,9 +63,9 @@ if __name__ == '__main__':
 
     J = 100
     K = 64
-    N_r = 4, 4
+    N_r = 4, 8
     N_t = 4, 4
-    L_range = (4, 5)
+    L_range = (20, 21)
     low_freq = 2.4e9
     sc_band = 2e4
     H = spatial_generate(N_r, N_t, K, J, L_range, low_freq, sc_band)
