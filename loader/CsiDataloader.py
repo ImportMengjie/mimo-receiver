@@ -101,6 +101,7 @@ class CsiDataloader:
 
         self.train_count = int(self.train_data_radio * self.J) * self.n_c
         data = data.reshape(self.J * self.n_c, self.n_sc, self.n_r, self.n_t)
+        self.rhh = (data.transpose(-1, -2).conj()@data).mean(0).mean(0)
         self.train_H = data[:self.train_count]
         self.test_H = data[self.train_count:]
         logging.info(

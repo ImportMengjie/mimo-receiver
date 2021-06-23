@@ -18,6 +18,7 @@ from utils.DetectionMethod import DetectionMethodConjugateGradient
 from utils.DenoisingMethod import DenoisingMethod
 from utils.DenoisingMethod import DenoisingMethodLS
 from utils.DenoisingMethod import DenoisingMethodMMSE
+from utils.DenoisingMethod import DenoisingMethodIdealMMSE
 from utils.DenoisingMethod import DenoisingMethodModel
 
 from utils.InterpolationMethod import InterpolationMethod

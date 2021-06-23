@@ -39,12 +39,27 @@ class DenoisingMethodLS(DenoisingMethod):
 class DenoisingMethodMMSE(DenoisingMethod):
 
     def get_key_name(self):
-        return 'MMSE'
+        return 'NonIdeal-MMSE'
 
     def get_h_hat(self, y, h, x, var, rhh):
         n_r = y.shape[-2]
         n_t = x.shape[-2]
         I = torch.eye(n_t, n_t)
+        h_hat = y @ torch.inverse(conj_t(x) @ rhh @ x + n_r * var * I) @ conj_t(
+            x) @ rhh
+        return h_hat
+
+
+class DenoisingMethodIdealMMSE(DenoisingMethod):
+
+    def get_key_name(self):
+        return 'Ideal-MMSE'
+
+    def get_h_hat(self, y, h, x, var, rhh):
+        n_r = y.shape[-2]
+        n_t = x.shape[-2]
+        I = torch.eye(n_t, n_t)
+        rhh = conj_t(h) @ h
         h_hat = y @ torch.inverse(conj_t(x) @ rhh @ x + n_r * var * I) @ conj_t(
             x) @ rhh
         return h_hat
