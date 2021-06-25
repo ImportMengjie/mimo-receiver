@@ -7,7 +7,7 @@ from utils.common import to_cuda
 
 import utils.config
 
-from utils.draw import draw_line
+from utils.draw import draw_line, draw_point_and_line
 
 from utils.DetectionMethod import DetectionMethod
 from utils.DetectionMethod import DetectionMethodZF

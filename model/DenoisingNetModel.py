@@ -108,12 +108,22 @@ class NonBlindDenosingModel(nn.Module):
         return out
 
 
-class DenoisingNetModel(BaseNetModel):
+class DenoisingNetBaseModel(BaseNetModel):
+
+    def __init__(self, csiDataloader: CsiDataloader, use_noise_level, only_return_noise_level):
+        super().__init__(csiDataloader)
+        self.use_noise_level = use_noise_level
+        self.only_return_noise_level = only_return_noise_level
+
+    def set_only_return_noise_level(self, only_return_noise_level):
+        self.only_return_noise_level = only_return_noise_level
+
+
+class CBDNetBaseModel(DenoisingNetBaseModel):
 
     def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32,
-                 kernel_size=(3, 3), use_noise_level=True):
-        super(DenoisingNetModel, self).__init__(csiDataloader)
-        self.use_noise_level = use_noise_level
+                 kernel_size=(3, 3), use_noise_level=True, only_return_noise_level=False):
+        super(CBDNetBaseModel, self).__init__(csiDataloader, use_noise_level, only_return_noise_level)
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
         self.noise_level_conv_num = noise_level_conv_num
@@ -123,11 +133,14 @@ class DenoisingNetModel(BaseNetModel):
 
         self.noise_level = NoiseLevelEstimationModel(self.n_r, self.n_t, noise_level_conv_num, channel_num, kernel_size)
         self.denosing = NonBlindDenosingModel(self.n_r, self.n_t, denosing_conv_num, channel_num, kernel_size)
+        self.name = self.base_name()
 
     def forward(self, x, sigma):
         x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
         if self.use_noise_level:
             sigma = self.noise_level(x)
+        if self.only_return_noise_level:
+            return None, sigma
         sigma_map = sigma.unsqueeze(-1).repeat(1, self.n_r, 2 * self.n_t).unsqueeze(1)
         concat_x = torch.cat([sigma_map, x], dim=1)
         noise = self.denosing(concat_x)
@@ -135,11 +148,14 @@ class DenoisingNetModel(BaseNetModel):
         h_hat = torch.cat((h_hat[:, :, :h_hat.shape[-2] // 2, :], h_hat[:, :, h_hat.shape[-2] // 2:, :]), -1)
         return h_hat, sigma.squeeze()
 
-    def __str__(self) -> str:
+    def base_name(self):
         return '{}-{}_r{}t{}_sigma{}denosing{}channel{}'.format(self.get_dataset_name(), self.__class__.__name__,
                                                                 self.n_r, self.n_t,
                                                                 self.noise_level_conv_num, self.denosing_conv_num,
                                                                 self.channel_num)
+
+    def __str__(self) -> str:
+        return self.name
 
     def basename(self):
         return 'denoising'
@@ -189,7 +205,7 @@ if __name__ == '__main__':
     dataset = DenoisingNetDataset(csiDataloader, DataType.train, [50, 51])
     dataloader = torch.utils.data.DataLoader(dataset, 10, True)
 
-    model = DenoisingNetModel(csiDataloader)
+    model = CBDNetBaseModel(csiDataloader)
     criterion = DenoisingNetLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 

@@ -127,7 +127,7 @@ class CsiDataloader:
             hx = hx.cpu()
         snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
         if self.channel_type == ChannelType.gpp or self.channel_type == ChannelType.spatial:
-            hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).reshape(-1, 1)
+            hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(1, 1)
             noise_var = hx_mean * (10 ** (-snrs / 10.))
         else:
             noise_var = self.n_t / self.n_r * np.power(10, -snrs / 10.)

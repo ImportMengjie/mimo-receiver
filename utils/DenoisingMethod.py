@@ -2,7 +2,7 @@ import abc
 from loader.CsiDataloader import CsiDataloader
 import torch
 
-from model import DenoisingNetModel
+from model import CBDNetBaseModel
 from utils import complex2real
 from utils import conj_t
 
@@ -39,7 +39,7 @@ class DenoisingMethodLS(DenoisingMethod):
 class DenoisingMethodMMSE(DenoisingMethod):
 
     def get_key_name(self):
-        return 'NonIdeal-MMSE'
+        return 'MMSE'
 
     def get_h_hat(self, y, h, x, var, rhh):
         n_r = y.shape[-2]
@@ -67,7 +67,7 @@ class DenoisingMethodIdealMMSE(DenoisingMethod):
 
 class DenoisingMethodModel(DenoisingMethod):
 
-    def __init__(self, model: DenoisingNetModel, use_gpu=True):
+    def __init__(self, model: CBDNetBaseModel, use_gpu=True):
         self.model = model
         self.model = self.model.eval()
         self.model.double()

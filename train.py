@@ -13,7 +13,7 @@ from loader import DetectionNetDataset
 from loader import InterpolationNetDataset
 from model import BaseNetModel
 from model import DenoisingNetLoss
-from model import DenoisingNetModel
+from model import CBDNetBaseModel
 from model import DenoisingNetTee
 from model import DetectionNetLoss
 from model import DetectionNetModel
@@ -145,7 +145,7 @@ def train_denoising_net(data_path: str, snr_range: list, ):
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
-    model = DenoisingNetModel(csi_dataloader)
+    model = CBDNetBaseModel(csi_dataloader)
     criterion = DenoisingNetLoss()
     param = TrainParam()
     param.loss_not_down_stop_count = 10
