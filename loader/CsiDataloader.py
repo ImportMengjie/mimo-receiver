@@ -16,8 +16,9 @@ class DataType(Enum):
 class ChannelType(Enum):
     gaussian = 1
     gpp = 2
-    spatial = 3
-    unknown = 4
+    spatial_ULA = 3
+    spatial_UPA = 4
+    unknown = 5
 
 
 def toNp(tensor: torch.Tensor):
@@ -101,7 +102,7 @@ class CsiDataloader:
 
         self.train_count = int(self.train_data_radio * self.J) * self.n_c
         data = data.reshape(self.J * self.n_c, self.n_sc, self.n_r, self.n_t)
-        self.rhh = (data.transpose(-1, -2).conj()@data).mean(0).mean(0)
+        self.rhh = (data.transpose(-1, -2).conj() @ data).mean(0).mean(0)
         self.train_H = data[:self.train_count]
         self.test_H = data[self.train_count:]
         logging.info(
@@ -126,7 +127,7 @@ class CsiDataloader:
         if hx.is_cuda:
             hx = hx.cpu()
         snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
-        if self.channel_type == ChannelType.gpp or self.channel_type == ChannelType.spatial:
+        if self.channel_type == ChannelType.gpp or self.channel_type == ChannelType.spatial_ULA or self.channel_type == ChannelType.spatial_UPA:
             hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(1, 1)
             noise_var = hx_mean * (10 ** (-snrs / 10.))
         else:
