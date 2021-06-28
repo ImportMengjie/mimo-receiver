@@ -140,14 +140,14 @@ class Train:
         return os.path.join(Train.save_dir, model.basename(), '{}.pth.tar'.format(str(model)))
 
 
-def train_denoising_net(data_path: str, snr_range: list, only_train_noise_level=False, use_true_sigma=False):
+def train_denoising_net(data_path: str, snr_range: list, only_train_noise_level=False, use_true_sigma=False, extra=''):
     assert not (only_train_noise_level and use_true_sigma)
     csi_dataloader = CsiDataloader(data_path, factor=1, train_data_radio=0.9)
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
     model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=6, denosing_conv_num=6, channel_num=64,
-                            use_true_sigma=use_true_sigma, only_return_noise_level=only_train_noise_level)
+                            use_true_sigma=use_true_sigma, only_return_noise_level=only_train_noise_level, extra=extra)
     criterion = DenoisingNetLoss(only_train_noise_level=only_train_noise_level)
     param = TrainParam()
     param.loss_not_down_stop_count = 10

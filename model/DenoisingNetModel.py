@@ -122,8 +122,9 @@ class DenoisingNetBaseModel(BaseNetModel):
 class CBDNetBaseModel(DenoisingNetBaseModel):
 
     def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32,
-                 kernel_size=(3, 3), use_true_sigma=True, only_return_noise_level=False):
+                 kernel_size=(3, 3), use_true_sigma=True, only_return_noise_level=False, extra=''):
         super(CBDNetBaseModel, self).__init__(csiDataloader, use_true_sigma, only_return_noise_level)
+        self.extra = extra
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
         self.noise_level_conv_num = noise_level_conv_num
@@ -149,10 +150,10 @@ class CBDNetBaseModel(DenoisingNetBaseModel):
         return h_hat, sigma.squeeze()
 
     def base_name(self):
-        return '{}-{}_r{}t{}_sigma{}denosing{}channel{}'.format(self.get_dataset_name(), self.__class__.__name__,
+        return '{}-{}_r{}t{}_sigma{}denosing{}channel{}{}'.format(self.get_dataset_name(), self.__class__.__name__,
                                                                 self.n_r, self.n_t,
                                                                 self.noise_level_conv_num, self.denosing_conv_num,
-                                                                self.channel_num)
+                                                                self.channel_num, self.extra)
 
     def __str__(self) -> str:
         return self.base_name()

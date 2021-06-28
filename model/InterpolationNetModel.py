@@ -22,7 +22,7 @@ class ConvReluBlock(nn.Module):
 class InterpolationNetModel(BaseNetModel):
 
     def __init__(self, csiDataloader: CsiDataloader, pilot_count: int = 3, num_conv_block=18, channel_num=64,
-                 kernel_size=(3, 3)):
+                 kernel_size=(3, 3), extra=''):
         super(InterpolationNetModel, self).__init__(csiDataloader)
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
@@ -39,6 +39,7 @@ class InterpolationNetModel(BaseNetModel):
         self.back_conv = nn.Conv2d(channel_num, 2, kernel_size, padding=padding)
 
         self.name = self.__str__()
+        self.extra = extra
 
     def forward(self, x):
         residual = x
@@ -49,9 +50,9 @@ class InterpolationNetModel(BaseNetModel):
         return out,
 
     def __str__(self) -> str:
-        return '{}-{}_r{}t{}sc{}p{}_block{}channel{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r,
+        return '{}-{}_r{}t{}sc{}p{}_block{}channel{}{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r,
                                                              self.n_t, self.n_sc,
-                                                             self.pilot_count, self.num_conv_block, self.channel_num)
+                                                             self.pilot_count, self.num_conv_block, self.channel_num, self.extra)
 
     def basename(self):
         return 'interpolation'
