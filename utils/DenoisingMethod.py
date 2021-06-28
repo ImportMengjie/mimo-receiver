@@ -3,8 +3,7 @@ from loader.CsiDataloader import CsiDataloader
 import torch
 
 from model import CBDNetBaseModel
-from utils import complex2real
-from utils import conj_t
+from utils import complex2real, conj_t
 
 import utils.config as config
 
@@ -84,12 +83,20 @@ class DenoisingMethodModel(DenoisingMethod):
         h_ls = h_ls.reshape(-1, *h_ls.shape[-2:])
         h_ls = complex2real(h_ls)
         var = var.repeat(1, n_sc, 1, 1).reshape(-1, 1)
-        if self.use_gpu:
-            h_ls = h_ls.cuda()
-            var = var.cuda()
-        h_hat, _ = self.model(h_ls, (var / 2) ** 0.5)
+        h_hat = None
+        for i in range(0, h_ls.shape[0], config.ANALYSIS_BATCH_SIZE):
+            h_ls_batch = h_ls[i:i+config.ANALYSIS_BATCH_SIZE]
+            var_batch = var[i:i+config.ANALYSIS_BATCH_SIZE]
+            if self.use_gpu:
+                h_ls_batch = h_ls_batch.cuda()
+                var_batch = var_batch.cuda()
+            h_hat_batch, _ = self.model(h_ls_batch, (var_batch/2)**0.5)
+            if h_hat_batch.is_cuda:
+                h_hat_batch = h_hat_batch.cpu()
+            if h_hat is None:
+                h_hat = h_hat_batch
+            else:
+                h_hat = torch.cat((h_hat, h_hat_batch), 0)
         h_hat = h_hat.reshape(h.shape + (2,))
         h_hat = h_hat[:, :, :, :, 0] + h_hat[:, :, :, :, 1] * 1j
-        if h_hat.is_cuda:
-            h_hat = h_hat.cpu()
         return h_hat
