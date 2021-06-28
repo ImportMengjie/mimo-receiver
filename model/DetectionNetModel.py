@@ -50,6 +50,8 @@ class DetectionNetModel(BaseNetModel):
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
         self.fix_forward_layer = False
 
+        self.name = self.__str__()
+
     def get_train_state(self):
         return {
             'train_layer': self.training_layer,

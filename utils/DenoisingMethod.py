@@ -75,7 +75,7 @@ class DenoisingMethodModel(DenoisingMethod):
             self.model = self.model.cuda()
 
     def get_key_name(self):
-        return self.model.__str__()
+        return self.model.name
 
     def get_h_hat(self, y, h, x, var, rhh):
         h_ls = y @ torch.inverse(x)

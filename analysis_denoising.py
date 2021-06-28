@@ -40,7 +40,7 @@ def analysis_denoising(csi_dataloader: CsiDataloader, denoising_method_list: Lis
 
 def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_model_list: List[DenoisingNetBaseModel],
                                    snr: int):
-    sigma_dict = {str(m): [] for m in denoising_model_list}
+    sigma_dict = {m.name: [] for m in denoising_model_list}
     for m in denoising_model_list:
         m.set_only_return_noise_level(True)
     x = csi_dataloader.get_pilot_x()
@@ -57,7 +57,7 @@ def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_mode
             if use_gpu:
                 h_ls_batch = h_ls_batch.cuda()
             _, sigma_hat = model(h_ls_batch, None)
-            sigma_dict[str(model)].extend([s.item() for s in sigma_hat.flatten()])
+            sigma_dict[model.name].extend([s.item() for s in sigma_hat.flatten()])
     for m in denoising_model_list:
         m.set_only_return_noise_level(False)
     return sigma, sigma_dict, [i for i in range(h_ls.shape[0])]

@@ -62,7 +62,7 @@ class InterpolationMethodModel(InterpolationMethodLine):
             self.model = model.cuda()
 
     def get_key_name(self):
-        return self.model.__str__()
+        return self.model.name
 
     def get_H_hat(self, y, H, xp, var):
         H_shape = H.shape

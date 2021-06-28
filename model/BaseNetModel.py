@@ -7,6 +7,7 @@ class BaseNetModel(nn.Module):
     def __init__(self, csiDataloader: CsiDataloader):
         super().__init__()
         self.csiDataloader = csiDataloader
+        self.name = BaseNetModel.__class__.__name__
 
     def get_dataset_name(self):
         return self.csiDataloader.__str__()

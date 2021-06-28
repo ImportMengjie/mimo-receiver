@@ -77,7 +77,7 @@ class DetectionMethodModel(DetectionMethod):
         super().__init__(modulation)
 
     def get_key_name(self):
-        return self.model.__str__()
+        return self.model.name
 
     def get_x_hat(self, y, h, x, var):
         A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])

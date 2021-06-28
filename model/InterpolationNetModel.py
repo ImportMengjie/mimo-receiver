@@ -38,6 +38,8 @@ class InterpolationNetModel(BaseNetModel):
         self.blocks = nn.Sequential(*blocks)
         self.back_conv = nn.Conv2d(channel_num, 2, kernel_size, padding=padding)
 
+        self.name = self.__str__()
+
     def forward(self, x):
         residual = x
         x = self.first_conv(x)

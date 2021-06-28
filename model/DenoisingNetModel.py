@@ -110,9 +110,9 @@ class NonBlindDenosingModel(nn.Module):
 
 class DenoisingNetBaseModel(BaseNetModel):
 
-    def __init__(self, csiDataloader: CsiDataloader, use_noise_level, only_return_noise_level):
+    def __init__(self, csiDataloader: CsiDataloader, use_true_sigma, only_return_noise_level):
         super().__init__(csiDataloader)
-        self.use_noise_level = use_noise_level
+        self.use_true_sigma = use_true_sigma
         self.only_return_noise_level = only_return_noise_level
 
     def set_only_return_noise_level(self, only_return_noise_level):
@@ -122,8 +122,8 @@ class DenoisingNetBaseModel(BaseNetModel):
 class CBDNetBaseModel(DenoisingNetBaseModel):
 
     def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32,
-                 kernel_size=(3, 3), use_noise_level=True, only_return_noise_level=False):
-        super(CBDNetBaseModel, self).__init__(csiDataloader, use_noise_level, only_return_noise_level)
+                 kernel_size=(3, 3), use_true_sigma=True, only_return_noise_level=False):
+        super(CBDNetBaseModel, self).__init__(csiDataloader, use_true_sigma, only_return_noise_level)
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
         self.noise_level_conv_num = noise_level_conv_num
@@ -137,7 +137,7 @@ class CBDNetBaseModel(DenoisingNetBaseModel):
 
     def forward(self, x, sigma):
         x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
-        if self.use_noise_level:
+        if not self.use_true_sigma:
             sigma = self.noise_level(x)
         if self.only_return_noise_level:
             return None, sigma
@@ -155,7 +155,7 @@ class CBDNetBaseModel(DenoisingNetBaseModel):
                                                                 self.channel_num)
 
     def __str__(self) -> str:
-        return self.name
+        return self.base_name()
 
     def basename(self):
         return 'denoising'
@@ -163,22 +163,26 @@ class CBDNetBaseModel(DenoisingNetBaseModel):
 
 class DenoisingNetLoss(nn.Module):
 
-    def __init__(self, a=0.3):
+    def __init__(self, a=0.3, only_train_noise_level=False):
         super().__init__()
         self.a = a
+        self.only_train_noise_level = only_train_noise_level
 
     def forward(self, h, h_hat, sigma, sigma_hat):
-        sigma = sigma.squeeze()
-        sigma_hat = sigma_hat.squeeze()
-        l2_h_loss = F.mse_loss(h_hat, h)
-        asym_loss = torch.mean(
-            torch.abs(self.a - F.relu(sigma - sigma_hat)) * torch.pow(sigma - sigma_hat, 2))
-        # asym_loss = F.mse_loss(sigma_map, sigma_map_hat)
-        # if not torch.isnan(sigma_hat[0]):
-        #     asym_loss = torch.mean((h_hat-h)**2/sigma_hat)
-        # else:
-        #     asym_loss = 0
-        loss = l2_h_loss + 0.5 * asym_loss
+        if self.only_train_noise_level:
+            loss = ((sigma - sigma_hat) ** 2).mean()
+        else:
+            sigma = sigma.squeeze()
+            sigma_hat = sigma_hat.squeeze()
+            l2_h_loss = F.mse_loss(h_hat, h)
+            asym_loss = torch.mean(
+                torch.abs(self.a - F.relu(sigma - sigma_hat)) * torch.pow(sigma - sigma_hat, 2))
+            # asym_loss = F.mse_loss(sigma_map, sigma_map_hat)
+            # if not torch.isnan(sigma_hat[0]):
+            #     asym_loss = torch.mean((h_hat-h)**2/sigma_hat)
+            # else:
+            #     asym_loss = 0
+            loss = l2_h_loss + 0.5 * asym_loss
         return loss
 
 

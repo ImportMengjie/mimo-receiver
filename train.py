@@ -140,17 +140,20 @@ class Train:
         return os.path.join(Train.save_dir, model.basename(), '{}.pth.tar'.format(str(model)))
 
 
-def train_denoising_net(data_path: str, snr_range: list, ):
-    csi_dataloader = CsiDataloader(data_path, factor=2)
+def train_denoising_net(data_path: str, snr_range: list, only_train_noise_level=False, use_true_sigma=False):
+    assert not (only_train_noise_level and use_true_sigma)
+    csi_dataloader = CsiDataloader(data_path, factor=1, train_data_radio=0.9)
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
-    model = CBDNetBaseModel(csi_dataloader)
-    criterion = DenoisingNetLoss()
+    model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=6, denosing_conv_num=6, channel_num=64,
+                            use_true_sigma=use_true_sigma, only_return_noise_level=only_train_noise_level)
+    criterion = DenoisingNetLoss(only_train_noise_level=only_train_noise_level)
     param = TrainParam()
     param.loss_not_down_stop_count = 10
-    param.epochs = 10
+    param.epochs = 50
     param.lr = 0.001
+    param.batch_size = 100
 
     train = Train(param, dataset, model, criterion, DenoisingNetTee, test_dataset)
     train.train()
@@ -317,7 +320,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/spatial_16_16_64_100.mat', [5, 100])
+    train_denoising_net('data/spatial_ULA_32_16_64_100.mat', [5, 30], only_train_noise_level=True, use_true_sigma=False)
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
