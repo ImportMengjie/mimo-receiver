@@ -85,12 +85,12 @@ class DenoisingMethodModel(DenoisingMethod):
         var = var.repeat(1, n_sc, 1, 1).reshape(-1, 1)
         h_hat = None
         for i in range(0, h_ls.shape[0], config.ANALYSIS_BATCH_SIZE):
-            h_ls_batch = h_ls[i:i+config.ANALYSIS_BATCH_SIZE]
-            var_batch = var[i:i+config.ANALYSIS_BATCH_SIZE]
+            h_ls_batch = h_ls[i:i + config.ANALYSIS_BATCH_SIZE]
+            var_batch = var[i:i + config.ANALYSIS_BATCH_SIZE]
             if self.use_gpu:
                 h_ls_batch = h_ls_batch.cuda()
                 var_batch = var_batch.cuda()
-            h_hat_batch, _ = self.model(h_ls_batch, (var_batch/2)**0.5)
+            h_hat_batch, _ = self.model(h_ls_batch, (var_batch / 2) ** 0.5)
             if h_hat_batch.is_cuda:
                 h_hat_batch = h_hat_batch.cpu()
             if h_hat is None:

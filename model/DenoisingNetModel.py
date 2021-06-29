@@ -121,19 +121,22 @@ class DenoisingNetBaseModel(BaseNetModel):
 
 class CBDNetBaseModel(DenoisingNetBaseModel):
 
-    def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=3, denosing_conv_num=3, channel_num=32,
-                 kernel_size=(3, 3), use_true_sigma=True, only_return_noise_level=False, extra=''):
+    def __init__(self, csiDataloader: CsiDataloader, noise_level_conv_num=4, noise_channel_num=32, denosing_conv_num=5,
+                 denosing_channel_num=64, kernel_size=(3, 3), use_true_sigma=False, only_return_noise_level=False,
+                 extra=''):
         super(CBDNetBaseModel, self).__init__(csiDataloader, use_true_sigma, only_return_noise_level)
         self.extra = extra
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
         self.noise_level_conv_num = noise_level_conv_num
+        self.noise_channel_num = noise_channel_num
         self.denosing_conv_num = denosing_conv_num
-        self.channel_num = channel_num
+        self.denoising_channel_num = denosing_channel_num
         self.kernel_size = kernel_size
 
-        self.noise_level = NoiseLevelEstimationModel(self.n_r, self.n_t, noise_level_conv_num, channel_num, kernel_size)
-        self.denosing = NonBlindDenosingModel(self.n_r, self.n_t, denosing_conv_num, channel_num, kernel_size)
+        self.noise_level = NoiseLevelEstimationModel(self.n_r, self.n_t, noise_level_conv_num, noise_channel_num,
+                                                     kernel_size)
+        self.denosing = NonBlindDenosingModel(self.n_r, self.n_t, denosing_conv_num, denosing_channel_num, kernel_size)
         self.name = self.base_name()
 
     def forward(self, x, sigma):
@@ -150,10 +153,10 @@ class CBDNetBaseModel(DenoisingNetBaseModel):
         return h_hat, sigma.squeeze()
 
     def base_name(self):
-        return '{}-{}_r{}t{}_sigma{}denosing{}channel{}{}'.format(self.get_dataset_name(), self.__class__.__name__,
-                                                                self.n_r, self.n_t,
-                                                                self.noise_level_conv_num, self.denosing_conv_num,
-                                                                self.channel_num, self.extra)
+        return '{}-{}_r{}t{}_sigma{}denosing{}channel{}-{}{}'.format(self.get_dataset_name(), self.__class__.__name__,
+                                                                     self.n_r, self.n_t, self.noise_level_conv_num,
+                                                                     self.denosing_conv_num, self.noise_channel_num,
+                                                                     self.denoising_channel_num, self.extra)
 
     def __str__(self) -> str:
         return self.base_name()

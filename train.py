@@ -37,6 +37,7 @@ class TrainParam:
     batch_size: int = 64
     use_scheduler: bool = True
     stop_when_test_loss_down_epoch_count = 20
+    log_loss_per_epochs: int = 10
 
 
 class Train:
@@ -105,7 +106,7 @@ class Train:
                 optimizer.step()
             self.losses.append(avg_loss.avg)
             avg_loss.reset()
-            if current_epoch % 10 == 0:
+            if current_epoch % self.param.log_loss_per_epochs == 0:
                 logging.info(
                     'epoch:{} avg_loss:{};{}'.format(current_epoch, self.losses[-1], ext_log))
             if self.test_dataloader and current_epoch % self.param.stop_when_test_loss_down_epoch_count == 0 and current_epoch >= self.param.epochs:
@@ -140,20 +141,28 @@ class Train:
         return os.path.join(Train.save_dir, model.basename(), '{}.pth.tar'.format(str(model)))
 
 
-def train_denoising_net(data_path: str, snr_range: list, only_train_noise_level=False, use_true_sigma=False, extra=''):
+def train_denoising_net(data_path: str, snr_range: list, noise_num=4, noise_channel=32, denoising_num=6,
+                        denoising_channel=64, only_train_noise_level=False, use_true_sigma=False, fix_noise=False,
+                        extra=''):
     assert not (only_train_noise_level and use_true_sigma)
+    assert not (only_train_noise_level and fix_noise)
     csi_dataloader = CsiDataloader(data_path, factor=1, train_data_radio=0.9)
     dataset = DenoisingNetDataset(csi_dataloader, DataType.train, snr_range)
     test_dataset = DenoisingNetDataset(csi_dataloader, DataType.test, snr_range)
 
-    model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=6, denosing_conv_num=6, channel_num=64,
+    model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=noise_num, noise_channel_num=noise_channel,
+                            denosing_conv_num=denoising_num, denosing_channel_num=denoising_channel,
                             use_true_sigma=use_true_sigma, only_return_noise_level=only_train_noise_level, extra=extra)
+    if fix_noise:
+        for p in model.noise_level.parameters():
+            p.requires_grad = False
     criterion = DenoisingNetLoss(only_train_noise_level=only_train_noise_level)
     param = TrainParam()
-    param.loss_not_down_stop_count = 10
+    param.stop_when_test_loss_down_epoch_count = 10
     param.epochs = 50
     param.lr = 0.001
     param.batch_size = 100
+    param.log_loss_per_epochs = 1
 
     train = Train(param, dataset, model, criterion, DenoisingNetTee, test_dataset)
     train.train()
@@ -320,7 +329,9 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/spatial_ULA_32_16_64_100.mat', [5, 30], only_train_noise_level=True, use_true_sigma=False)
+    train_denoising_net('data/spatial_ULA_32_16_64_100.mat', [5, 30], noise_num=4, noise_channel=32, denoising_num=6,
+                        denoising_channel=64, only_train_noise_level=True, use_true_sigma=False, fix_noise=False,
+                        extra='')
     # train_interpolation_net('data/3gpp_16_16_64_5_5.mat', [50, 51], 4)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')

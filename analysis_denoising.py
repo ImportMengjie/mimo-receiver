@@ -57,6 +57,8 @@ def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_mode
             if use_gpu:
                 h_ls_batch = h_ls_batch.cuda()
             _, sigma_hat = model(h_ls_batch, None)
+            if sigma_hat.is_cuda:
+                sigma_hat = sigma_hat.cpu()
             sigma_dict[model.name].extend([s.item() for s in sigma_hat.flatten()])
     for m in denoising_model_list:
         m.set_only_return_noise_level(False)
@@ -70,23 +72,27 @@ if __name__ == '__main__':
     # csi_dataloader = CsiDataloader('data/3gpp_16_16_64_100_10.mat', train_data_radio=0.9, factor=1)
     csi_dataloader = CsiDataloader('data/spatial_32_16_64_100.mat', train_data_radio=0.9, factor=1)
     # csi_dataloader = CsiDataloader('data/gaussian_16_16_1_100.mat', train_data_radio=0.9, factor=1)
-    model = CBDNetBaseModel(csi_dataloader, 6, 6, 72)
+    model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=4, noise_channel_num=32,
+                            denosing_conv_num=6, denosing_channel_num=64,
+                            use_true_sigma=False, only_return_noise_level=False, extra='')
     save_model_path = Train.get_save_path_from_model(model)
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
         model.load_state_dict(model_info['state_dict'])
         model = model.double()
+        model = model.eval()
     else:
         logging.warning('unable load {}'.format(save_model_path))
+    if use_gpu:
+        model = model.cuda()
 
     denoising_model = [model]
     sigma, sigma_dict, x = analysis_denoising_noise_level(csi_dataloader, denoising_model, 20)
-    draw_point_and_line(x, sigma_dict, sigma, title='sigma est', save_dir=config.DENOISING_RESULT_IMG)
+    draw_point_and_line(x, sigma_dict, sigma, title='sigma-est', save_dir=config.DENOISING_RESULT_IMG)
 
     denoising_methods = [DenoisingMethodMMSE(), DenoisingMethodLS(), DenoisingMethodIdealMMSE(),
                          DenoisingMethodModel(model, use_gpu)]
     # denoising_methods = [DenoisingMethodMMSE(), DenoisingMethodLS(), DenoisingMethodIdealMMSE()]
 
     nmse_dict, x = analysis_denoising(csi_dataloader, denoising_methods, 0, 30, 1)
-    # draw_line(x, nmse_dict, lambda n: n <= 10)
     draw_line(x, nmse_dict, title='denoising-{}'.format(csi_dataloader.__str__()), save_dir=config.DENOISING_RESULT_IMG)
