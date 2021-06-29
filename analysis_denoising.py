@@ -1,6 +1,7 @@
 import os
 from typing import List
 
+import numpy as np
 import torch
 
 from loader import CsiDataloader, DataType
@@ -62,6 +63,21 @@ def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_mode
             sigma_dict[model.name].extend([s.item() for s in sigma_hat.flatten()])
     for m in denoising_model_list:
         m.set_only_return_noise_level(False)
+    for k, v in sigma_dict.items():
+        sigma_hat_v = np.array(v)
+        sigma_v = np.full(sigma_hat_v.shape, sigma)
+        count = sigma_v.shape[0]
+        error = sigma_hat_v - sigma_v
+        up_est_count = np.sum(error > 0)
+        down_est_count = np.sum(error < 0)
+        error_mean = error.mean()
+        error_median = np.median(error)
+        error_var = np.var(error)
+        logging.error(
+            'est sigma error result: mean {:.4}, up {}/{}, down {}/{}, median {:.4}, var {:.4}'.format(error_mean, up_est_count,
+                                                                                              count, down_est_count,
+                                                                                              count, error_median,
+                                                                                              error_var))
     return sigma, sigma_dict, [i for i in range(h_ls.shape[0])]
 
 
@@ -70,7 +86,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     # csi_dataloader = CsiDataloader('data/3gpp_16_16_64_100_10.mat', train_data_radio=0.9, factor=1)
-    csi_dataloader = CsiDataloader('data/spatial_32_16_64_100.mat', train_data_radio=0.9, factor=1)
+    csi_dataloader = CsiDataloader('data/spatial_ULA_32_16_64_100.mat', train_data_radio=0.9, factor=1)
     # csi_dataloader = CsiDataloader('data/gaussian_16_16_1_100.mat', train_data_radio=0.9, factor=1)
     model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=4, noise_channel_num=32,
                             denosing_conv_num=6, denosing_channel_num=64,

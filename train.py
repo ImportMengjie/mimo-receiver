@@ -74,6 +74,7 @@ class Train:
                 torch.save(model_info, self.get_save_path())
 
     def train(self, save=True, reload=True, ext_log: str = ''):
+        logging.warning('start train:{}'.format(str(self.model)))
         self.losses.clear()
         current_epoch = 0
         test_loss = []

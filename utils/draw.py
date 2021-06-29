@@ -28,9 +28,9 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, show
 def draw_point_and_line(x, y_dict_point: dict, y_line=None, title=None, save_dir=None, show=True, xlabel='index',
                         ylabel='sigma'):
     for name, y in y_dict_point.items():
-        plt.scatter(x, y, s=1)
+        plt.scatter(x, y, s=1, label=name)
     if y_line:
-        plt.plot(x, [y_line for _ in range(len(x))])
+        plt.plot(x, [y_line for _ in range(len(x))], label='true')
     if title:
         plt.title(title)
     plt.xlabel(xlabel)

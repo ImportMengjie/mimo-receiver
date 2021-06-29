@@ -79,7 +79,7 @@ if __name__ == '__main__':
     K = 64
     N_r = 4, 8
     N_t = 4, 4
-    L_range = (20, 21)
+    L_range = (3, 4)
     low_freq = 2.4e9
     sc_band = 2e4
     arrayant = Arrayant.ULA
@@ -89,7 +89,7 @@ if __name__ == '__main__':
     n_r = N_r[0] * N_r[1]
     n_t = N_t[0] * N_t[1]
     n_sc = K
-    filename = 'spatial_{}_{}_{}_{}_{}.mat'.format(arrayant.name, n_r, n_t, n_sc, J)
+    filename = 'spatial_{}_{}_{}_{}_{}_l{}_{}.mat'.format(arrayant.name, n_r, n_t, n_sc, J, L_range[0], L_range[1])
     save_path = os.path.join(os.path.split(sys.argv[0])[0], '../data/{}'.format(filename))
     f = h5py.File(save_path, 'w')
     f.create_dataset('H', data=H.transpose())
