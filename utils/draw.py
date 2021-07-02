@@ -42,3 +42,4 @@ def draw_point_and_line(x, y_dict_point: dict, y_line=None, title=None, save_dir
         plt.savefig(save_path, format='png')
     if show:
         plt.show()
+    plt.close('all')

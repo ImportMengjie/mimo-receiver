@@ -1,4 +1,5 @@
 import torch
+import random
 
 from loader import BaseDataset
 from loader import CsiDataloader
@@ -32,7 +33,7 @@ class DenoisingNetDataset(BaseDataset):
         n_sc_idx = item % self.csiDataloader.n_sc
         idx = item // self.csiDataloader.n_sc
         h = complex2real(self.h[idx, n_sc_idx])
-        sigma = self.sigma[idx, 0, 0, 0]
+        sigma = self.sigma[random.randint(0, self.sigma.shape[0] - 1), 0, 0, 0]
         n = self.csiDataloader.get_noise_from_half_sigma(sigma, False)
         y = self.hx[idx, n_sc_idx] + n
         h_ls = complex2real(y @ self.x_p_inv)
