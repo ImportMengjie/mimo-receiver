@@ -25,7 +25,9 @@ def conj_t(mat: torch.Tensor):
     return mat.conj().transpose(-1, -2)
 
 
-def line_interpolation_hp_pilot(h_p: torch.Tensor, pilot_idx: torch.Tensor, n_sc: int):
+def line_interpolation_hp_pilot(h_p: torch.Tensor, pilot_idx: torch.Tensor, n_sc: int, use_abs_angle=True):
+    if use_abs_angle:
+        h_p = torch.abs(h_p) + 1j * torch.angle(h_p)
     repeat_nums = []
     line_factor = [0.]
     left = 0
@@ -53,6 +55,8 @@ def line_interpolation_hp_pilot(h_p: torch.Tensor, pilot_idx: torch.Tensor, n_sc
             diff_h = diff
     diff_h = torch.cat((diff_h, h_p[:, -1:]), 1)
     h_interpolation = repeat_h + line_factor * diff_h
+    if use_abs_angle:
+        h_interpolation = h_interpolation.real * torch.exp(1j * h_interpolation.imag)
     return h_interpolation
 
 

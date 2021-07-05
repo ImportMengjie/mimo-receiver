@@ -1,55 +1,12 @@
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 
 from loader import CsiDataloader
 from loader import DataType
 from loader import DenoisingNetDataset
-from model import Tee
 from model import BaseNetModel
-
-import utils.config as config
-
-
-class Padding(nn.Module):
-
-    def __init__(self, kernel_size):
-        super().__init__()
-        self.kernel_size = kernel_size[1]
-
-    def forward(self, x):
-        zeros = torch.zeros(x.shape[:-1] + (self.kernel_size - 1,))
-        if config.USE_GPU:
-            zeros = zeros.cuda()
-        return torch.cat((x[:, :, :, :x.shape[-1] // 2], zeros, x[:, :, :, x.shape[-1] // 2:]), -1)
-
-
-class ConvBnReluBlock(nn.Module):
-
-    def __init__(self, in_channel: int, out_channel: int, kernel_size, padding):
-        super(ConvBnReluBlock, self).__init__()
-        assert padding[1] == 0
-        self.padding = Padding(kernel_size)
-        self.conv = nn.Conv2d(in_channel, out_channel, kernel_size, padding=padding)
-        self.bn = nn.BatchNorm2d(out_channel)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        return self.relu(self.bn(self.conv(self.padding(x))))
-
-
-class ConvReluBlock(nn.Module):
-
-    def __init__(self, in_channel: int, out_channel: int, kernel_size, padding):
-        super().__init__()
-        assert padding[1] == 0
-        self.padding = Padding(kernel_size)
-        self.conv = nn.Conv2d(in_channel, out_channel, kernel_size, padding=padding)
-        self.relu = nn.ReLU(inplace=True)
-
-    def forward(self, x):
-        return self.relu(self.conv(self.padding(x)))
+from model import Tee
+from utils.model import *
 
 
 class NoiseLevelEstimationModel(nn.Module):

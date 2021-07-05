@@ -7,6 +7,7 @@ from utils import complex2real
 from utils import line_interpolation_hp_pilot
 from utils import get_interpolation_pilot_idx
 from utils import DenoisingMethod
+from utils import config
 
 
 class InterpolationMethod(abc.ABC):
@@ -23,14 +24,30 @@ class InterpolationMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_H_hat(self, y, H, xp, var):
+    def get_H_hat(self, y, H, xp, var, rhh):
         pass
 
-    def get_nmse(self, y, H, xp, var):
-        H_hat = self.get_H_hat(y, H, xp, var)
+    def get_nmse(self, y, H, xp, var, rhh):
+        H_hat = self.get_H_hat(y, H, xp, var, rhh)
         nmse = ((torch.abs(H - H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(H) ** 2).sum(-1).sum(-1)).mean()
         nmse = 10 * torch.log10(nmse)
         return nmse.item()
+
+    def get_pilot_nmse_and_interp_nmse(self, y, H, xp, var, rhh):
+        H_hat = self.get_H_hat(y, H, xp, var, rhh)
+        pilot_H = H[:, self.pilot_idx]
+        pilot_H_hat = H_hat[:, self.pilot_idx]
+        data_H = H[:, torch.logical_not(self.pilot_idx)]
+        data_H_hat = H_hat[:, torch.logical_not(self.pilot_idx)]
+        nmse_pilot = None
+        if self.denoisingMethod:
+            nmse_pilot = ((torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
+                -1)).mean()
+            nmse_pilot = 10 * torch.log10(nmse_pilot)
+        nmse_data = ((torch.abs(data_H - data_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(data_H) ** 2).sum(-1).sum(
+            -1)).mean()
+        nmse_data = 10 * torch.log10(nmse_data)
+        return nmse_pilot, nmse_data
 
 
 class InterpolationMethodLine(InterpolationMethod):
@@ -39,14 +56,17 @@ class InterpolationMethodLine(InterpolationMethod):
         super().__init__(n_sc, pilot_count, denoisingMethod)
 
     def get_key_name(self):
-        return 'line'
+        if self.denoisingMethod:
+            return 'line' + '-' + self.denoisingMethod.get_key_name()
+        else:
+            return 'line' + '-' + 'true'
 
-    def get_H_hat(self, y, H, xp, var):
+    def get_H_hat(self, y, H, xp, var, rhh):
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
-            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, None)
-        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc, False)
         return H_hat
 
 
@@ -54,28 +74,41 @@ class InterpolationMethodModel(InterpolationMethodLine):
 
     def __init__(self, model: InterpolationNetModel, use_gpu, denoisingMethod: DenoisingMethod = None) -> None:
         super().__init__(model.n_sc, model.pilot_count, denoisingMethod)
-        self.model = model
-        self.model.double()
-        self.model.eval()
+        self.model = model.double().eval()
         self.use_gpu = use_gpu
         if self.use_gpu:
             self.model = model.cuda()
 
     def get_key_name(self):
-        return self.model.name
+        if self.denoisingMethod is not None:
+            return self.model.name + "-" + self.denoisingMethod.get_key_name()
+        else:
+            return self.model.name + "-" + 'true'
 
-    def get_H_hat(self, y, H, xp, var):
-        H_shape = H.shape
-        H = super().get_H_hat(y, H, xp, var)
-        H = H.reshape([H_shape[0], -1, H_shape[-1]])
-        H = complex2real(H)
-        H = H.permute(0, 3, 1, 2)
-        if self.use_gpu:
-            H = H.cuda()
-        H_hat, = self.model(H, )
-        H_hat = H_hat.permute(0, 2, 3, 1)
-        H_hat = H_hat[:, :, :, 0] + H_hat[:, :, :, 1] * 1j
-        H_hat = H_hat.reshape(H_shape)
-        if H_hat.is_cuda:
-            H_hat = H_hat.cpu()
-        return H_hat
+    def get_H_hat(self, y, H, xp, var, rhh):
+        J, n_sc, n_r, n_t = H.shape
+        h_p = H[:, self.pilot_idx]
+        if self.denoisingMethod is not None:
+            y = y[:, self.pilot_idx]
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+        H_hat = H_hat.permute(0, 3, 1, 2)
+        H_hat = H_hat.reshape(-1, H_hat.shape[-2:])
+        model_H_hat = None
+        for i in range(0, H_hat.shape[0], config.ANALYSIS_BATCH_SIZE):
+            H_hat_batch = H_hat[i:i + config.ANALYSIS_BATCH_SIZE]
+
+            if self.use_gpu:
+                H_hat_batch = H_hat_batch.cuda()
+            model_H_hat_batch = self.model(H_hat_batch)
+            if model_H_hat_batch.is_cuda:
+                model_H_hat_batch = model_H_hat_batch.cpu()
+
+            if model_H_hat is None:
+                model_H_hat = model_H_hat_batch
+            else:
+                model_H_hat = torch.cat((model_H_hat, model_H_hat_batch), 0)
+        model_H_hat = model_H_hat.reshape(J, n_t, n_sc, n_r, 2)
+        model_H_hat = model_H_hat.permute(0, 2, 3, 1, 4)
+        model_H_hat = model_H_hat[:, :, :, :, 0] + 1j * model_H_hat[:, :, :, :, 1]
+        return model_H_hat

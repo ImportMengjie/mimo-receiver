@@ -24,3 +24,5 @@ from utils.DenoisingMethod import DenoisingMethodModel
 from utils.InterpolationMethod import InterpolationMethod
 from utils.InterpolationMethod import InterpolationMethodLine
 from utils.InterpolationMethod import InterpolationMethodModel
+
+from utils.model import Padding, ConvReluBlock, ConvBnReluBlock

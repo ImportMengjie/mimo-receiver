@@ -1,5 +1,5 @@
 import torch
-from torch.utils.data.dataset import T_co
+import random
 
 from loader import BaseDataset
 from loader import CsiDataloader
@@ -14,57 +14,44 @@ import utils.config as config
 
 class InterpolationNetDataset(BaseDataset):
 
-    def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list, pilot_count: int,
-                 interpolation=True, denoisingMethod: DenoisingMethod = None) -> None:
+    def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list, pilot_count: int, ) -> None:
         super().__init__(csiDataloader, dataType, snr_range)
         self.pilot_count = pilot_count
-        self.interpolation = interpolation
         self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
+        self.pilot_count = torch.sum(self.pilot_idx)
 
         self.xp = csiDataloader.get_pilot_x()
-        hx = self.h @ self.xp
-        self.n, self.sigma = csiDataloader.noise_snr_range(hx, snr_range)
-        self.sigma = self.sigma**0.5
-
-        self.n = self.n[:, self.pilot_idx, :, :]
         self.h_p = self.h[:, self.pilot_idx, :, :]
-        self.y = self.h_p @ self.xp + self.n
-        if denoisingMethod is not None:
-            self.h_p = denoisingMethod.get_h_hat(self.y, self.h_p, self.xp, self.sigma ** 2, None)
-        self.h_interpolation = None
-        if self.interpolation:
-            self.h_interpolation = line_interpolation_hp_pilot(self.h_p, self.pilot_idx, csiDataloader.n_sc)
+        hx = self.h @ self.xp
+        self.var = csiDataloader.get_var_from_snr(hx, snr_range)
+        self.hx = self.h_p @ self.xp
+        self.xp_inv = torch.inverse(self.xp)
 
     def cuda(self):
-        if torch.cuda.is_available():
-            if self.interpolation:
-                self.h_interpolation = self.h_interpolation.cuda()
-            else:
-                self.h_p = self.h_p.cuda()
-            self.h = self.h.cuda()
+        pass
 
     def __len__(self):
-        return self.h_p.shape[0]
+        return self.h.shape[0] * self.csiDataloader.n_t
 
-    def __getitem__(self, index) -> T_co:
-        h = self.h_p[index] if not self.interpolation else self.h_interpolation[index]
+    def __getitem__(self, index):
+        n_j = index // self.csiDataloader.n_t
+        n_t_user = index % self.csiDataloader.n_t
+        var = self.var[random.randint(0, self.var.shape[0] - 1), 0, 0, 0]
 
-        H = self.h[index]
-
-        h = h.reshape([-1, h.shape[-1]])
-        H = H.reshape([-1, H.shape[-1]])
-        h = complex2real(h)
-        H = complex2real(H)
-
-        h = h.permute(2, 0, 1)
-        H = H.permute(2, 0, 1)
+        H = self.h[n_j]
+        y = self.hx[n_j] + self.csiDataloader.get_noise_from_half_sigma((var/2)**0.5, count=self.pilot_count)
+        h_pilot_ls = y @ self.xp_inv
+        H_interpolation = line_interpolation_hp_pilot(h_pilot_ls.reshape((1, ) + h_pilot_ls.shape), self.pilot_idx, self.csiDataloader.n_sc, True)
+        H_interpolation.squeeze_()
+        H = complex2real(H[:, :, n_t_user])
+        H_interpolation = complex2real(H_interpolation[:, :, n_t_user])
         if config.USE_GPU:
-            h = to_cuda(h)
-            H = to_cuda(H)
-        return h, H
+            H = H.cuda()
+            H_interpolation = H_interpolation.cuda()
+        return H_interpolation, H, var
 
 
 if __name__ == '__main__':
     csiDataloader = CsiDataloader('../data/h_16_16_64_1.mat')
     dataset = InterpolationNetDataset(csiDataloader, DataType.train, [100, 101], 3)
-    h, H = dataset.__getitem__(1)
+    # h, H = dataset.__getitem__(1)
