@@ -41,8 +41,9 @@ class InterpolationMethod(abc.ABC):
         data_H_hat = H_hat[:, torch.logical_not(self.pilot_idx)]
         nmse_pilot = None
         if self.denoisingMethod:
-            nmse_pilot = ((torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
-                -1)).mean()
+            nmse_pilot = (
+                        (torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
+                    -1)).mean()
             nmse_pilot = 10 * torch.log10(nmse_pilot)
         nmse_data = ((torch.abs(data_H - data_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(data_H) ** 2).sum(-1).sum(
             -1)).mean()
@@ -100,10 +101,9 @@ class InterpolationMethodModel(InterpolationMethodLine):
 
             if self.use_gpu:
                 H_hat_batch = H_hat_batch.cuda()
-            model_H_hat_batch = self.model(H_hat_batch)
+            model_H_hat_batch, _ = self.model(H_hat_batch)
             if model_H_hat_batch.is_cuda:
-                model_H_hat_batch = model_H_hat_batch.cpu()
-
+                model_H_hat_batch = model_H_hat_batch.detach().cpu()
             if model_H_hat is None:
                 model_H_hat = model_H_hat_batch
             else:

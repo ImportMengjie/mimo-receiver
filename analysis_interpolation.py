@@ -4,7 +4,7 @@ from typing import List
 import torch
 
 from loader import CsiDataloader, DataType
-from model import InterpolationNetModel
+from model import InterpolationNetModel, CBDNetSFModel
 from train import Train
 from utils import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel
 from utils import draw_line
@@ -26,7 +26,8 @@ def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_l
         n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
         y = hx + n
         for i in range(len(interpolation_method_list)):
-            pilot_nmse, data_nmse = interpolation_method_list[i].get_pilot_nmse_and_interp_nmse(y, h, xp, var, csi_dataloader.rhh)
+            pilot_nmse, data_nmse = interpolation_method_list[i].get_pilot_nmse_and_interp_nmse(y, h, xp, var,
+                                                                                                csi_dataloader.rhh)
             pilot_nmse_list[i].append(pilot_nmse)
             data_nmse_list[i].append(data_nmse)
     pilot_nmse_k_v = {}
@@ -42,20 +43,25 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/spatial_mu_ULA_32_16_64_100_l3_4.mat')
-    pilot_count = 31
-    model = InterpolationNetModel(csi_dataloader, pilot_count)
+    pilot_count = 6
+    model = CBDNetSFModel(csi_dataloader, pilot_count, noise_level_conv=4, noise_channel=32,
+                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
+                          kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
+                          only_return_noise_level=False, extra='')
     save_model_path = Train.get_save_path_from_model(model)
     if os.path.exists(save_model_path):
         model_info = torch.load(save_model_path)
         model.load_state_dict(model_info['state_dict'])
     else:
         logging.warning('unable load {} model'.format(save_model_path))
-    interpolation_methods = [# InterpolationMethodLine(csi_dataloader.n_sc, pilot_count),
-                             InterpolationMethodLine(csi_dataloader.n_sc, pilot_count,DenoisingMethodLS()),
-                             InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodMMSE()),
-                             InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE())]
+    interpolation_methods = [  # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count),
+        InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS()),
+        InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodMMSE()),
+        InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE())]
 
     pilot_nmse_dict, data_nmse_dict, x = analysis_interpolation(csi_dataloader, interpolation_methods, 0, 30, 2)
     # draw_line(x, nmse_dict, lambda n: n <= 10)
-    draw_line(x, pilot_nmse_dict, title='interpolation-pilot-{}'.format(csi_dataloader.__str__()), save_dir=config.INTERPOLATION_RESULT_IMG)
-    draw_line(x, data_nmse_dict, title='interpolation-data-{}'.format(csi_dataloader.__str__()), save_dir=config.INTERPOLATION_RESULT_IMG)
+    draw_line(x, pilot_nmse_dict, title='interpolation-pilot-{}'.format(csi_dataloader.__str__()),
+              save_dir=config.INTERPOLATION_RESULT_IMG)
+    draw_line(x, data_nmse_dict, title='interpolation-data-{}'.format(csi_dataloader.__str__()),
+              save_dir=config.INTERPOLATION_RESULT_IMG)
