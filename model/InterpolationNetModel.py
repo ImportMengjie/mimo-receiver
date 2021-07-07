@@ -6,6 +6,7 @@ import torch.utils.data
 from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
+from utils import get_interpolation_pilot_idx
 from utils.model import *
 
 
@@ -71,7 +72,7 @@ class CBDNetSFModel(BaseNetModel):
                  denoising_conv=6, denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
                  only_return_noise_level=False, extra=''):
         super().__init__(csiDataloader)
-        self.pilot_count = pilot_count
+        self.pilot_count = torch.sum(get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)).item()
         self.noise_level_conv = noise_level_conv
         self.noise_channel = noise_channel
         self.noise_dnn = noise_dnn
@@ -106,7 +107,7 @@ class CBDNetSFModel(BaseNetModel):
     def forward(self, x, var):
         """
         :param x: batch, N_sc, N_r, 2
-        :param var:
+        :param var: batch,1
         :return:
         """
         if not self.use_two_dim:
@@ -117,6 +118,8 @@ class CBDNetSFModel(BaseNetModel):
             sigma = var ** 0.5
         if not self.use_true_sigma:
             sigma = self.noise_level(x)
+
+        assert sigma.shape[1] == 1
         if self.only_return_noise_level:
             return None, sigma
         if self.use_two_dim:
@@ -150,7 +153,8 @@ class InterpolationNetModel(BaseNetModel):
         padding = ((kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2)
 
         self.first_conv = nn.Conv2d(2, channel_num, kernel_size=kernel_size, padding=padding)
-        blocks = [ConvReluBlock(channel_num, channel_num, kernel_size, padding, use_2dim=True) for _ in range(num_conv_block)]
+        blocks = [ConvReluBlock(channel_num, channel_num, kernel_size, padding, use_2dim=True) for _ in
+                  range(num_conv_block)]
         self.blocks = nn.Sequential(*blocks)
         self.back_conv = nn.Conv2d(channel_num, 2, kernel_size, padding=padding)
 

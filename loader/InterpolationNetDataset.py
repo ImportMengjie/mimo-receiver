@@ -48,6 +48,7 @@ class InterpolationNetDataset(BaseDataset):
         if config.USE_GPU:
             H = H.cuda()
             H_interpolation = H_interpolation.cuda()
+            var = var.cuda()
         return H_interpolation, H, var
 
 

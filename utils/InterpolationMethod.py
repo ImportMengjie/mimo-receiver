@@ -1,9 +1,9 @@
 import abc
 import torch
 
-from model import InterpolationNetModel
+from model import CBDNetSFModel
 
-from utils import complex2real
+from utils import complex2real, DenoisingMethodLS
 from utils import line_interpolation_hp_pilot
 from utils import get_interpolation_pilot_idx
 from utils import DenoisingMethod
@@ -15,9 +15,9 @@ class InterpolationMethod(abc.ABC):
     def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None) -> None:
         super().__init__()
         self.n_sc = n_sc
-        self.pilot_count = pilot_count
         self.denoisingMethod = denoisingMethod
         self.pilot_idx = get_interpolation_pilot_idx(n_sc, pilot_count)
+        self.pilot_count = torch.sum(self.pilot_idx).item()
 
     @abc.abstractmethod
     def get_key_name(self):
@@ -42,8 +42,8 @@ class InterpolationMethod(abc.ABC):
         nmse_pilot = None
         if self.denoisingMethod:
             nmse_pilot = (
-                        (torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
-                    -1)).mean()
+                    (torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
+                -1)).mean()
             nmse_pilot = 10 * torch.log10(nmse_pilot)
         nmse_data = ((torch.abs(data_H - data_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(data_H) ** 2).sum(-1).sum(
             -1)).mean()
@@ -73,7 +73,8 @@ class InterpolationMethodLine(InterpolationMethod):
 
 class InterpolationMethodModel(InterpolationMethodLine):
 
-    def __init__(self, model: InterpolationNetModel, use_gpu, denoisingMethod: DenoisingMethod = None) -> None:
+    def __init__(self, model: CBDNetSFModel, use_gpu, ) -> None:
+        denoisingMethod = DenoisingMethodLS()
         super().__init__(model.n_sc, model.pilot_count, denoisingMethod)
         self.model = model.double().eval()
         self.use_gpu = use_gpu
@@ -94,14 +95,17 @@ class InterpolationMethodModel(InterpolationMethodLine):
             h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
         H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
         H_hat = H_hat.permute(0, 3, 1, 2)
-        H_hat = H_hat.reshape(-1, H_hat.shape[-2:])
+        H_hat = complex2real(H_hat.reshape((-1,) + H_hat.shape[-2:]))
+        var = var.repeat((1, 1, 1, n_t)).reshape(-1, 1)
         model_H_hat = None
         for i in range(0, H_hat.shape[0], config.ANALYSIS_BATCH_SIZE):
             H_hat_batch = H_hat[i:i + config.ANALYSIS_BATCH_SIZE]
+            var_batch = var[i: i + config.ANALYSIS_BATCH_SIZE]
 
             if self.use_gpu:
                 H_hat_batch = H_hat_batch.cuda()
-            model_H_hat_batch, _ = self.model(H_hat_batch)
+                var_batch = var_batch.cuda()
+            model_H_hat_batch, _ = self.model(H_hat_batch, var_batch)
             if model_H_hat_batch.is_cuda:
                 model_H_hat_batch = model_H_hat_batch.detach().cpu()
             if model_H_hat is None:
@@ -111,4 +115,4 @@ class InterpolationMethodModel(InterpolationMethodLine):
         model_H_hat = model_H_hat.reshape(J, n_t, n_sc, n_r, 2)
         model_H_hat = model_H_hat.permute(0, 2, 3, 1, 4)
         model_H_hat = model_H_hat[:, :, :, :, 0] + 1j * model_H_hat[:, :, :, :, 1]
-        return model_H_hat
+        return model_H_hat.detach()
