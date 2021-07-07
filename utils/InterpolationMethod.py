@@ -24,6 +24,10 @@ class InterpolationMethod(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def get_pilot_name(self):
+        pass
+
+    @abc.abstractmethod
     def get_H_hat(self, y, H, xp, var, rhh):
         pass
 
@@ -62,6 +66,12 @@ class InterpolationMethodLine(InterpolationMethod):
         else:
             return 'line' + '-' + 'true'
 
+    def get_pilot_name(self):
+        if self.denoisingMethod:
+            return self.denoisingMethod.get_key_name()
+        else:
+            return 'true'
+
     def get_H_hat(self, y, H, xp, var, rhh):
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
@@ -73,19 +83,21 @@ class InterpolationMethodLine(InterpolationMethod):
 
 class InterpolationMethodModel(InterpolationMethodLine):
 
-    def __init__(self, model: CBDNetSFModel, use_gpu, ) -> None:
+    def __init__(self, model: CBDNetSFModel, use_gpu, pilot_count=None) -> None:
         denoisingMethod = DenoisingMethodLS()
-        super().__init__(model.n_sc, model.pilot_count, denoisingMethod)
+        if pilot_count is None:
+            pilot_count = model.pilot_count
+        super().__init__(model.n_sc, pilot_count, denoisingMethod)
         self.model = model.double().eval()
         self.use_gpu = use_gpu
         if self.use_gpu:
             self.model = model.cuda()
 
     def get_key_name(self):
-        if self.denoisingMethod is not None:
-            return self.model.name + "-" + self.denoisingMethod.get_key_name()
-        else:
-            return self.model.name + "-" + 'true'
+        return self.model.name
+
+    def get_pilot_name(self):
+        return self.model.name
 
     def get_H_hat(self, y, H, xp, var, rhh):
         J, n_sc, n_r, n_t = H.shape

@@ -3,13 +3,13 @@ from typing import List
 
 import torch
 
+import utils.config as config
 from loader import CsiDataloader, DataType
-from model import InterpolationNetModel, CBDNetSFModel
+from model import CBDNetSFModel
 from train import Train
+from utils import DenoisingMethodMMSE, DenoisingMethodIdealMMSE, DenoisingMethodLS
 from utils import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel
 from utils import draw_line
-import utils.config as config
-from utils import DenoisingMethodMMSE, DenoisingMethodIdealMMSE, DenoisingMethodLS, DenoisingMethod
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -33,18 +33,35 @@ def analysis_interpolation(csi_dataloader: CsiDataloader, interpolation_method_l
     pilot_nmse_k_v = {}
     data_nmse_k_v = {}
     for i in range(len(pilot_nmse_list)):
-        pilot_nmse_k_v[interpolation_method_list[i].get_key_name()] = pilot_nmse_list[i]
+        pilot_nmse_k_v[interpolation_method_list[i].get_pilot_name()] = pilot_nmse_list[i]
         data_nmse_k_v[interpolation_method_list[i].get_key_name()] = data_nmse_list[i]
     return pilot_nmse_k_v, data_nmse_k_v, list(range(snr_start, snr_end, snr_step))
 
+
+def draw_pilot_and_data_nmse(csi_dataloader: CsiDataloader, interpolation_method_list: List[InterpolationMethod],
+                             snr_start, snr_end, snr_step):
+    n_sc, pilot_count = interpolation_method_list[0].n_sc, interpolation_method_list[0].pilot_count
+    pilot_nmse_dict, data_nmse_dict, x = analysis_interpolation(csi_dataloader, interpolation_method_list, snr_start,
+                                                                snr_end, snr_step)
+    draw_line(x, pilot_nmse_dict,
+              title='interpolation-pilot{}/{}-{}'.format(pilot_count, n_sc, csi_dataloader.__str__()),
+              save_dir=config.INTERPOLATION_RESULT_IMG)
+    draw_line(x, data_nmse_dict,
+              title='interpolation-data{}/{}-{}'.format(n_sc - pilot_count, n_sc, csi_dataloader.__str__()),
+              save_dir=config.INTERPOLATION_RESULT_IMG)
+
+def draw_block_pilot_nmse(csi_dataloader: CsiDataloader, interpolation_method_list: List[InterpolationMethod],
+                             snr_start, snr_end, snr_step):
+    pass
 
 if __name__ == '__main__':
     import logging
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
     csi_dataloader = CsiDataloader('data/spatial_mu_ULA_32_16_64_10_l20_21.mat', train_data_radio=0.9)
-    pilot_count = 31
-    model = CBDNetSFModel(csi_dataloader, pilot_count, noise_level_conv=4, noise_channel=32,
+    pilot_count = 63
+    pilot_count_model = 31
+    model = CBDNetSFModel(csi_dataloader, pilot_count_model, noise_level_conv=4, noise_channel=32,
                           noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
                           kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
                           only_return_noise_level=False, extra='l20')
@@ -62,11 +79,8 @@ if __name__ == '__main__':
         InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS()),
         InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodMMSE()),
         InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE()),
-        InterpolationMethodModel(model, use_gpu)
+        InterpolationMethodModel(model, use_gpu, pilot_count)
     ]
 
-    pilot_nmse_dict, data_nmse_dict, x = analysis_interpolation(csi_dataloader, interpolation_methods, 0, 30, 2)
-    draw_line(x, pilot_nmse_dict, title='interpolation-pilot-{}'.format(csi_dataloader.__str__()),
-              save_dir=config.INTERPOLATION_RESULT_IMG)
-    draw_line(x, data_nmse_dict, title='interpolation-data-{}'.format(csi_dataloader.__str__()),
-              save_dir=config.INTERPOLATION_RESULT_IMG)
+    draw_pilot_and_data_nmse(csi_dataloader, interpolation_methods, snr_start=0, snr_end=30, snr_step=2)
+
