@@ -142,6 +142,19 @@ class Train:
         return os.path.join(Train.save_dir, model.basename(), '{}.pth.tar'.format(str(model)))
 
 
+def load_model_from_file(model, use_gpu: bool):
+    save_model_path = Train.get_save_path_from_model(model)
+    if os.path.exists(save_model_path):
+        model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
+        model.load_state_dict(model_info['state_dict'])
+        model = model.double().eval()
+        if use_gpu:
+            model = model.cuda()
+    else:
+        logging.warning('unable load {} model'.format(save_model_path))
+    return model
+
+
 def train_denoising_net(data_path: str, snr_range: list, noise_num=4, noise_channel=32, denoising_num=6,
                         denoising_channel=64, only_train_noise_level=False, use_true_sigma=False, fix_noise=False,
                         extra=''):

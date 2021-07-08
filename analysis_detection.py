@@ -4,7 +4,7 @@ import torch
 
 from loader import CsiDataloader, DataType, DetectionNetDataset
 from model import DetectionNetModel, DetectionNetLoss, DetectionNetTee
-from train import Train, TrainParam
+from train import Train, TrainParam, load_model_from_file
 from utils import DetectionMethod
 from utils import DetectionMethodZF
 from utils import DetectionMethodMMSE
@@ -104,18 +104,13 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/gaussian_16_16_1_1.mat', train_data_radio=0, factor=10000)
+    csi_dataloader = CsiDataloader('data/spatial_ULA_32_16_64_100_l20_21.mat', train_data_radio=0, factor=1)
     layer = csi_dataloader.n_t * 2
-    modulation = 'bpsk'
+    modulation = 'qpsk'
     model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation)
-    save_model_path = Train.get_save_path_from_model(model)
-    if os.path.exists(save_model_path):
-        model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
-        model.load_state_dict(model_info['state_dict'])
-    else:
-        logging.warning('unable load {} file'.format(save_model_path))
-    detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),
-                         DetectionMethodModel(model, modulation, use_gpu)]
+    model = load_model_from_file(model, use_gpu)
+    detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),]
+    #                      DetectionMethodModel(model, modulation, use_gpu)]
     # detection_methods = [DetectionMethodMMSE('qpsk')]
     # detection_methods = [DetectionMethodMMSE(constellation), #DetectionMethodModel(model, constellation),
     #                      DetectionMethodConjugateGradient(constellation, csi_dataloader.n_t),

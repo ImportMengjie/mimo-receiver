@@ -6,7 +6,7 @@ import torch
 
 from loader import CsiDataloader, DataType
 from model import DenoisingNetBaseModel, CBDNetBaseModel
-from train import Train
+from train import Train, load_model_from_file
 from utils import DenoisingMethod, draw_line, conj_t, complex2real, draw_point_and_line
 from utils import DenoisingMethodLS
 from utils import DenoisingMethodMMSE
@@ -48,7 +48,7 @@ def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_mode
     hx = h @ x
     sigma_list = []
     sigma_dict_list = []
-    text_list = []
+    text_label = ""
     for snr in snr_list:
         sigma_dict = {m.name: [] for m in denoising_model_list}
         n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
@@ -75,18 +75,20 @@ def analysis_denoising_noise_level(csi_dataloader: CsiDataloader, denoising_mode
             error = sigma_hat_v - sigma_v
             up_est_count = np.sum(error > 0)
             down_est_count = np.sum(error < 0)
-            error_mean = error.mean()
+            error_mean = np.abs(error).mean()
             error_median = np.median(error)
             error_var = np.var(error)
-            text_result = '{}db:est sigma error: mean {:.4}, up {}/{}, down {}/{}, median {:.4}, var {:.4}'.format(
+            max_value = np.max(np.abs(error))
+            text_result = '{}db:est sigma error: mean {:.4}, up {}/{}, down {}/{}, median {:.4}, var {:.4}, max {:.4}'.format(
                 snr, error_mean, up_est_count,
                 count, down_est_count,
                 count, error_median,
-                error_var)
+                error_var, max_value)
             logging.error(text_result)
-            text_list.append(text_result)
+            draw_text = '{}db:mean{:.2}var{:.2}max{:.2}'.format(snr, error_mean, error_var, max_value)
+            text_label += draw_text
         sigma_dict_list.append(sigma_dict)
-    return sigma_list, sigma_dict_list, [i for i in range(h_ls.shape[0])], text_list
+    return sigma_list, sigma_dict_list, [i for i in range(h_ls.shape[0])], text_label
 
 
 if __name__ == '__main__':
@@ -97,23 +99,14 @@ if __name__ == '__main__':
     csi_dataloader = CsiDataloader('data/spatial_ULA_32_16_64_100.mat', train_data_radio=0.9, factor=1)
     # csi_dataloader = CsiDataloader('data/gaussian_16_16_1_100.mat', train_data_radio=0.9, factor=1)
     model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=4, noise_channel_num=32,
-                            denosing_conv_num=6, denosing_channel_num=64,
+                            denosing_conv_num=6, denosing_channel_num=32,
                             use_true_sigma=False, only_return_noise_level=False, extra='')
-    save_model_path = Train.get_save_path_from_model(model)
-    if os.path.exists(save_model_path):
-        model_info = torch.load(save_model_path, map_location=torch.device('cpu'))
-        model.load_state_dict(model_info['state_dict'])
-        model = model.double()
-        model = model.eval()
-    else:
-        logging.warning('unable load {}'.format(save_model_path))
-    if use_gpu:
-        model = model.cuda()
+    model = load_model_from_file(model, use_gpu)
 
     denoising_model = [model]
-    sigma_list, sigma_dict_list, x, text_list = analysis_denoising_noise_level(csi_dataloader, denoising_model,
+    sigma_list, sigma_dict_list, x, text_label = analysis_denoising_noise_level(csi_dataloader, denoising_model,
                                                                                [15, 20])
-    draw_point_and_line(x, sigma_dict_list, sigma_list, text_list=text_list, title='sigma-est',
+    draw_point_and_line(x, sigma_dict_list, sigma_list, text_label=text_label, title='sigma-est',
                         save_dir=config.DENOISING_RESULT_IMG)
 
     denoising_methods = [DenoisingMethodMMSE(), DenoisingMethodLS(), DenoisingMethodIdealMMSE(),

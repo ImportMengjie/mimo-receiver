@@ -12,12 +12,16 @@ from utils import config
 
 class InterpolationMethod(abc.ABC):
 
-    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None) -> None:
+    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None, only_est_data=False,
+                 extra='') -> None:
+        assert not (denoisingMethod is None and self.only_est_data)
         super().__init__()
         self.n_sc = n_sc
         self.denoisingMethod = denoisingMethod
         self.pilot_idx = get_interpolation_pilot_idx(n_sc, pilot_count)
         self.pilot_count = torch.sum(self.pilot_idx).item()
+        self.only_est_data = only_est_data
+        self.extra = extra
 
     @abc.abstractmethod
     def get_key_name(self):
@@ -44,7 +48,7 @@ class InterpolationMethod(abc.ABC):
         data_H = H[:, torch.logical_not(self.pilot_idx)]
         data_H_hat = H_hat[:, torch.logical_not(self.pilot_idx)]
         nmse_pilot = None
-        if self.denoisingMethod:
+        if self.denoisingMethod and not self.only_est_data:
             nmse_pilot = (
                     (torch.abs(pilot_H - pilot_H_hat) ** 2).sum(-1).sum(-1) / (torch.abs(pilot_H) ** 2).sum(-1).sum(
                 -1)).mean()
@@ -57,14 +61,19 @@ class InterpolationMethod(abc.ABC):
 
 class InterpolationMethodLine(InterpolationMethod):
 
-    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None) -> None:
-        super().__init__(n_sc, pilot_count, denoisingMethod)
+    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None, only_data_est=False,
+                 extra='') -> None:
+        super().__init__(n_sc, pilot_count, denoisingMethod, only_data_est, extra)
 
     def get_key_name(self):
         if self.denoisingMethod:
-            return 'line' + '-' + self.denoisingMethod.get_key_name()
+            if self.only_est_data:
+                key_name = self.denoisingMethod.get_key_name()
+            else:
+                key_name = 'line' + '-' + self.denoisingMethod.get_key_name()
         else:
-            return 'line' + '-' + 'true'
+            key_name = 'line' + '-' + 'true'
+        return key_name + self.extra
 
     def get_pilot_name(self):
         if self.denoisingMethod:
@@ -75,26 +84,30 @@ class InterpolationMethodLine(InterpolationMethod):
     def get_H_hat(self, y, H, xp, var, rhh):
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
-            y = y[:, self.pilot_idx]
-            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+            if self.only_est_data:
+                return self.denoisingMethod.get_h_hat(y, H, xp, var, rhh)
+                pass
+            else:
+                y = y[:, self.pilot_idx]
+                h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
         H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc, False)
         return H_hat
 
 
 class InterpolationMethodModel(InterpolationMethodLine):
 
-    def __init__(self, model: CBDNetSFModel, use_gpu, pilot_count=None) -> None:
+    def __init__(self, model: CBDNetSFModel, use_gpu, pilot_count=None, extra='') -> None:
         denoisingMethod = DenoisingMethodLS()
         if pilot_count is None:
             pilot_count = model.pilot_count
-        super().__init__(model.n_sc, pilot_count, denoisingMethod)
+        super().__init__(model.n_sc, pilot_count, denoisingMethod, False, extra)
         self.model = model.double().eval()
         self.use_gpu = use_gpu
         if self.use_gpu:
             self.model = model.cuda()
 
     def get_key_name(self):
-        return self.model.name
+        return self.model.name + self.extra
 
     def get_pilot_name(self):
         return self.model.name

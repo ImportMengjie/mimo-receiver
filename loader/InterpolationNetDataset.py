@@ -46,10 +46,10 @@ class InterpolationNetDataset(BaseDataset):
         H = complex2real(H[:, :, n_t_user])
         H_interpolation = complex2real(H_interpolation[:, :, n_t_user])
         if config.USE_GPU:
-            H = H.cuda()
-            H_interpolation = H_interpolation.cuda()
-            var = var.cuda()
-        return H_interpolation, H, var
+            H = to_cuda(H)
+            H_interpolation = to_cuda(H_interpolation)
+            var = to_cuda(var)
+        return H_interpolation, H, var.reshape(-1)
 
 
 if __name__ == '__main__':
