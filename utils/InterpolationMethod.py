@@ -1,5 +1,6 @@
 import abc
 import torch
+import numpy as np
 
 from model import CBDNetSFModel
 
@@ -86,11 +87,45 @@ class InterpolationMethodLine(InterpolationMethod):
         if self.denoisingMethod is not None:
             if self.only_est_data:
                 return self.denoisingMethod.get_h_hat(y, H, xp, var, rhh)
-                pass
             else:
                 y = y[:, self.pilot_idx]
                 h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
         H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc, False)
+        return H_hat
+
+
+class InterpolationMethodChuck(InterpolationMethodLine):
+
+    def __init__(self, n_sc, pilot_count: int, path_count: int, denoisingMethod: DenoisingMethod = None, extra=''):
+        super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
+        self.chuck_array = np.concatenate((np.ones(path_count), np.zeros(n_sc - path_count)))
+        self.chuck_array = self.chuck_array.reshape((-1, 1))
+
+    def get_key_name(self):
+        key_name = 'chuck'
+        if self.denoisingMethod:
+            key_name += '-' + self.denoisingMethod.get_key_name()
+        return key_name + self.extra
+
+    def get_pilot_name(self):
+        if self.denoisingMethod:
+            return 'chuck-'+self.denoisingMethod.get_key_name()
+        else:
+            return 'chuck-true'
+
+    def get_H_hat(self, y, H, xp, var, rhh):
+        h_p = H[:, self.pilot_idx]
+        if self.denoisingMethod is not None:
+            y = y[:, self.pilot_idx]
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+        H_hat = H_hat.permute(0, 3, 1, 2)
+        H_hat = H_hat.numpy()
+        H_hat_in_time = np.fft.ifft2(H_hat)
+        H_hat_in_time = H_hat_in_time * self.chuck_array
+        H_hat = np.fft.fft2(H_hat_in_time)
+        H_hat = torch.from_numpy(H_hat)
+        H_hat = H_hat.permute(0, 2, 3, 1)
         return H_hat
 
 
