@@ -109,7 +109,7 @@ class InterpolationMethodChuck(InterpolationMethodLine):
 
     def get_pilot_name(self):
         if self.denoisingMethod:
-            return 'chuck-'+self.denoisingMethod.get_key_name()
+            return 'chuck-' + self.denoisingMethod.get_key_name()
         else:
             return 'chuck-true'
 
@@ -118,12 +118,29 @@ class InterpolationMethodChuck(InterpolationMethodLine):
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
             h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
-        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
-        H_hat = H_hat.permute(0, 3, 1, 2)
-        H_hat = H_hat.numpy()
-        H_hat_in_time = np.fft.ifft2(H_hat)
-        H_hat_in_time = H_hat_in_time * self.chuck_array
-        H_hat = np.fft.fft2(H_hat_in_time)
+        if self.n_sc == self.pilot_count:
+            H_hat = h_p
+            H_hat = H_hat.permute(0, 3, 1, 2)
+            H_hat = H_hat.numpy()
+            H_hat_in_time = np.fft.ifft2(H_hat)
+            H_hat_in_time = H_hat_in_time * self.chuck_array
+            H_hat = np.fft.fft2(H_hat_in_time)
+        else:
+            h_p = h_p.permute(0, 3, 1, 2)
+            h_p = h_p.numpy()
+            h_p_in_time = np.fft.ifft(h_p, axis=-2)
+            # h_p_in_time = np.fft.ifft2(h_p)
+            split_idx = self.pilot_count
+            zeros_count = self.n_sc - self.pilot_count
+            H_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
+                                          np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                          h_p_in_time[:, :, split_idx:]), axis=-2)
+            H_hat = np.fft.fft(H_p_in_time, axis=-2)
+            # H_hat = np.fft.fft2(H_p_in_time)
+            H_hat_in_time = np.fft.ifft2(H_hat)
+            H_hat_in_time = H_hat_in_time * self.chuck_array
+            H_hat = np.fft.fft2(H_hat_in_time)
+
         H_hat = torch.from_numpy(H_hat)
         H_hat = H_hat.permute(0, 2, 3, 1)
         return H_hat
