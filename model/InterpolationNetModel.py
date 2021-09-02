@@ -26,9 +26,12 @@ class NoiseLevelModel(nn.Module):
         self.conv_bn_relu_seq = [ConvBnReluBlock(channel_num, channel_num, kernel_size, padding, use_2dim) for _ in
                                  range(conv_num)]
         self.conv_bn_relu_seq = nn.Sequential(*self.conv_bn_relu_seq)
-        self.back_conv = nn.Conv2d(self.channel_num, 2 if use_2dim else 1, kernel_size, padding=padding)
+        self.back_conv = nn.Conv2d(self.channel_num, 1, kernel_size, padding=padding)
 
-        fc = [2 * n_sc * n_r, ] + list(dnns) + [1, ]
+        if use_2dim:
+            fc = [n_sc * n_r] + list(dnns) + [1, ]
+        else:
+            fc = [2 * n_sc * n_r, ] + list(dnns) + [1, ]
         self.fc = []
         for i, j in zip(fc[:-1], fc[1:]):
             self.fc.append(nn.Linear(i, j))

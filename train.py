@@ -22,7 +22,7 @@ from model import InterpolationNetLoss
 from model import CBDNetSFModel
 from model import InterpolationNetTee
 from model import Tee
-from utils import AvgLoss
+from utils import AvgLoss, print_parameter_number
 import utils.config as config
 
 
@@ -78,6 +78,7 @@ class Train:
         self.losses.clear()
         current_epoch = 0
         test_loss = []
+        Train.save_per_epoch = self.param.stop_when_test_loss_down_epoch_count
 
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
@@ -167,6 +168,7 @@ def train_denoising_net(data_path: str, snr_range: list, noise_num=4, noise_chan
     model = CBDNetBaseModel(csi_dataloader, noise_level_conv_num=noise_num, noise_channel_num=noise_channel,
                             denosing_conv_num=denoising_num, denosing_channel_num=denoising_channel,
                             use_true_sigma=use_true_sigma, only_return_noise_level=only_train_noise_level, extra=extra)
+    print_parameter_number(model)
     if fix_noise:
         for p in model.noise_level.parameters():
             p.requires_grad = False

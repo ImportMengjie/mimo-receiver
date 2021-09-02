@@ -80,6 +80,12 @@ def to_cuda(mat: torch.Tensor):
     return mat
 
 
+def print_parameter_number(net):
+    total_num = sum(p.numel() for p in net.parameters())
+    trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
+    print({'Total': total_num, 'Trainable': trainable_num})
+
+
 if __name__ == '__main__':
     h = torch.arange(0, 64).reshape(-1, 1, 1) * torch.ones(8, 8)
     h = h.reshape(1, -1, 8, 8).repeat(10, 1, 1, 1)

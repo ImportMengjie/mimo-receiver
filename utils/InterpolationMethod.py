@@ -23,6 +23,7 @@ class InterpolationMethod(abc.ABC):
         self.pilot_count = torch.sum(self.pilot_idx).item()
         self.only_est_data = only_est_data
         self.extra = extra
+        self.is_denosing = self.pilot_idx == self.n_sc
 
     @abc.abstractmethod
     def get_key_name(self):
@@ -102,14 +103,22 @@ class InterpolationMethodChuck(InterpolationMethodLine):
         self.chuck_array = self.chuck_array.reshape((-1, 1))
 
     def get_key_name(self):
-        key_name = 'chuck'
+        if self.is_denosing:
+            key_name = 'dft-chuck'
+        else:
+            key_name = 'dft-padding'
         if self.denoisingMethod:
             key_name += '-' + self.denoisingMethod.get_key_name()
         return key_name + self.extra
 
     def get_pilot_name(self):
         if self.denoisingMethod:
-            return 'chuck-' + self.denoisingMethod.get_key_name()
+            if self.is_denosing:
+                ret_name = 'dft-chuck-'
+            else:
+                ret_name = 'dft-padding-'
+
+            return ret_name + self.denoisingMethod.get_key_name()
         else:
             return 'chuck-true'
 
@@ -193,3 +202,27 @@ class InterpolationMethodModel(InterpolationMethodLine):
         model_H_hat = model_H_hat.permute(0, 2, 3, 1, 4)
         model_H_hat = model_H_hat[:, :, :, :, 0] + 1j * model_H_hat[:, :, :, :, 1]
         return model_H_hat.detach()
+
+    def get_sigma_hat(self, y, H, xp, var, rhh):
+        J, n_sc, n_r, n_t = H.shape
+        h_p = H[:, self.pilot_idx]
+        if self.denoisingMethod is not None:
+            y = y[:, self.pilot_idx]
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+        H_hat = H_hat.permute(0, 3, 1, 2)
+        H_hat = complex2real(H_hat.reshape((-1,) + H_hat.shape[-2:]))
+        var = var.repeat((1, 1, 1, n_t)).reshape(-1, 1)
+        sigma_list = []
+        for i in range(0, H_hat.shape[0], config.ANALYSIS_BATCH_SIZE):
+            H_hat_batch = H_hat[i:i + config.ANALYSIS_BATCH_SIZE]
+            var_batch = var[i: i + config.ANALYSIS_BATCH_SIZE]
+
+            if self.use_gpu:
+                H_hat_batch = H_hat_batch.cuda()
+                var_batch = var_batch.cuda()
+            _, var_hat = self.model(H_hat_batch, var_batch)
+            if var_hat.is_cuda:
+                var_hat = var_hat.cpu()
+            sigma_list.extend([s.item()**0.5 for s in var_hat.flatten()])
+        return sigma_list
