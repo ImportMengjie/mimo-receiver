@@ -145,10 +145,10 @@ class InterpolationMethodChuck(InterpolationMethodLine):
                                           np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
                                           h_p_in_time[:, :, split_idx:]), axis=-2)
             H_hat = np.fft.fft(H_p_in_time, axis=-2)
-            # H_hat = np.fft.fft2(H_p_in_time)
-            H_hat_in_time = np.fft.ifft2(H_hat)
-            H_hat_in_time = H_hat_in_time * self.chuck_array
-            H_hat = np.fft.fft2(H_hat_in_time)
+
+            # H_hat_in_time = np.fft.ifft2(H_hat)
+            # H_hat_in_time = H_hat_in_time * self.chuck_array
+            # H_hat = np.fft.fft2(H_hat_in_time)
 
         H_hat = torch.from_numpy(H_hat)
         H_hat = H_hat.permute(0, 2, 3, 1)

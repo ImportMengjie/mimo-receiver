@@ -8,6 +8,7 @@ from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
 from utils import get_interpolation_pilot_idx
+from utils import complex2real
 from utils.model import *
 
 
@@ -74,9 +75,10 @@ class CBDNetSFModel(BaseNetModel):
     def __init__(self, csiDataloader: CsiDataloader, pilot_count, noise_level_conv=4, noise_channel=32,
                  noise_dnn=(2000, 200, 50),
                  denoising_conv=6, denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
-                 only_return_noise_level=False, extra='', dft_chuck=0):
+                 only_return_noise_level=False, extra='', dft_chuck=0, use_dft_padding=False):
         super().__init__(csiDataloader)
-        self.pilot_count = torch.sum(get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)).item()
+        self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
+        self.pilot_count = torch.sum(self.pilot_idx).item()
         self.noise_level_conv = noise_level_conv
         self.noise_channel = noise_channel
         self.noise_dnn = noise_dnn
@@ -91,9 +93,11 @@ class CBDNetSFModel(BaseNetModel):
                                            use_two_dim)
         self.denoising = NonBlindDenoisingModel(denoising_conv, denoising_channel, kernel_size, use_two_dim)
         self.dft_chuck = dft_chuck
+        self.use_dft_padding = use_dft_padding
         if self.dft_chuck > 0:
             self.chuck_array = np.concatenate((np.ones(self.dft_chuck), np.zeros(self.n_sc - self.dft_chuck)))
             self.chuck_array = self.chuck_array.reshape((-1, 1))
+
         self.name = self.__str__()
 
     def __str__(self):
@@ -109,6 +113,8 @@ class CBDNetSFModel(BaseNetModel):
                                                                               self.use_two_dim, self.extra)
         if self.dft_chuck > 0:
             name += '_chuck{}'.format(self.dft_chuck)
+        if self.use_dft_padding:
+            name += '_dft_padding'
         return name
 
     def basename(self):
@@ -120,16 +126,25 @@ class CBDNetSFModel(BaseNetModel):
         :param var: batch,1
         :return:
         """
+        if self.use_dft_padding:
+            x = x.cpu().numpy()
+            x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
+            x = np.fft.ifft(x, axis=-2)
+            x = np.concatenate((x, np.zeros(x.shape[:2]+(self.n_sc-self.pilot_count, x.shape[-1]))), axis=-2)
+            x = np.fft.fft(x, axis=-2)
+            x = complex2real(x)
+            if config.USE_GPU:
+                x = x.cuda()
         if self.dft_chuck > 0:
-            x = x.numpy()
+            x = x.cpu().numpy()
             x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
             x = np.fft.ifft2(x)
             x = x * self.chuck_array
             x = np.fft.fft2(x)
             x = torch.from_numpy(x)
+            x = complex2real(x)
             if config.USE_GPU:
                 x = x.cuda()
-            pass
         if not self.use_two_dim:
             x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
             sigma = (var / 2) ** 0.5
