@@ -187,7 +187,7 @@ def train_denoising_net(data_path: str, snr_range: list, noise_num=4, noise_chan
 def train_interpolation_net(data_path: str, snr_range: list, pilot_count, noise_level_conv=4, noise_channel=32,
                             noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
                             use_two_dim=True, use_true_sigma=False, only_train_noise_level=False, fix_noise=False,
-                            extra=''):
+                            extra='', dft_chuck = 0):
     assert not (only_train_noise_level and use_true_sigma)
     assert not (only_train_noise_level and fix_noise)
     csi_dataloader = CsiDataloader(data_path, train_data_radio=0.9)
@@ -197,7 +197,7 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count, noise_
     model = CBDNetSFModel(csi_dataloader, pilot_count, noise_level_conv=noise_level_conv, noise_channel=noise_channel,
                           noise_dnn=noise_dnn, denoising_conv=denoising_conv, denoising_channel=denoising_channel,
                           kernel_size=kernel_size, use_two_dim=use_two_dim, use_true_sigma=use_true_sigma,
-                          only_return_noise_level=only_train_noise_level, extra=extra)
+                          only_return_noise_level=only_train_noise_level, extra=extra, dft_chuck=dft_chuck)
     criterion = InterpolationNetLoss(only_train_noise_level=only_train_noise_level, use2dim=use_two_dim)
     param = TrainParam()
     param.stop_when_test_loss_down_epoch_count = 5
@@ -358,13 +358,13 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    train_denoising_net('data/spatial_ULA_32_16_64_100.mat', [5, 30], noise_num=4, noise_channel=32, denoising_num=6,
-                        denoising_channel=64, only_train_noise_level=True, use_true_sigma=False, fix_noise=False,
-                        extra='')
+    # train_denoising_net('data/spatial_ULA_32_16_64_100.mat', [5, 30], noise_num=4, noise_channel=32, denoising_num=6,
+    #                     denoising_channel=64, only_train_noise_level=True, use_true_sigma=False, fix_noise=False,
+    #                     extra='')
     train_interpolation_net(data_path='data/spatial_mu_ULA_32_16_64_100_l3_4.mat', snr_range=[2, 35], pilot_count=31, noise_level_conv=4, noise_channel=32,
                             noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
                             use_two_dim=True, use_true_sigma=False, only_train_noise_level=False, fix_noise=False,
-                            extra='')
+                            extra='', dft_chuck=10)
     # train_detection_net('data/gaussian_16_16_1_100.mat', [60, 50, 20])
     # train_detection_net('data/gaussian_16_16_1_1.mat', [30, 20, 15, 10], retrain=True, modulation='qpsk')
     # train_detection_net_2('data/gaussian_16_16_1_1.mat', [5, 60], modulation='bpsk', retrain=True)

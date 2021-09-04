@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+import numpy as np
 
 from loader import CsiDataloader
 from model import Tee
@@ -73,7 +74,7 @@ class CBDNetSFModel(BaseNetModel):
     def __init__(self, csiDataloader: CsiDataloader, pilot_count, noise_level_conv=4, noise_channel=32,
                  noise_dnn=(2000, 200, 50),
                  denoising_conv=6, denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
-                 only_return_noise_level=False, extra=''):
+                 only_return_noise_level=False, extra='', dft_chuck=0):
         super().__init__(csiDataloader)
         self.pilot_count = torch.sum(get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)).item()
         self.noise_level_conv = noise_level_conv
@@ -89,11 +90,14 @@ class CBDNetSFModel(BaseNetModel):
         self.noise_level = NoiseLevelModel(self.n_sc, self.n_r, noise_level_conv, noise_channel, noise_dnn, kernel_size,
                                            use_two_dim)
         self.denoising = NonBlindDenoisingModel(denoising_conv, denoising_channel, kernel_size, use_two_dim)
-
+        self.dft_chuck = dft_chuck
+        if self.dft_chuck > 0:
+            self.chuck_array = np.concatenate((np.ones(self.dft_chuck), np.zeros(self.n_sc - self.dft_chuck)))
+            self.chuck_array = self.chuck_array.reshape((-1, 1))
         self.name = self.__str__()
 
     def __str__(self):
-        return '{}-{}_r{}t{}K{}p{}_cn{}-{}ch{}-{}dn{}k{}-{}_2dim{}_{}'.format(self.get_dataset_name(),
+        name = '{}-{}_r{}t{}K{}p{}_cn{}-{}ch{}-{}dn{}k{}-{}_2dim{}_{}'.format(self.get_dataset_name(),
                                                                               self.__class__.__name__, self.n_r,
                                                                               self.n_t, self.n_sc, self.pilot_count,
                                                                               self.denoising_conv,
@@ -103,6 +107,9 @@ class CBDNetSFModel(BaseNetModel):
                                                                               '-'.join(map(str, self.noise_dnn)),
                                                                               self.kernel_size[0], self.kernel_size[1],
                                                                               self.use_two_dim, self.extra)
+        if self.dft_chuck > 0:
+            name += '_chuck{}'.format(self.dft_chuck)
+        return name
 
     def basename(self):
         return 'interpolation'
@@ -113,6 +120,16 @@ class CBDNetSFModel(BaseNetModel):
         :param var: batch,1
         :return:
         """
+        if self.dft_chuck > 0:
+            x = x.numpy()
+            x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
+            x = np.fft.ifft2(x)
+            x = x * self.chuck_array
+            x = np.fft.fft2(x)
+            x = torch.from_numpy(x)
+            if config.USE_GPU:
+                x = x.cuda()
+            pass
         if not self.use_two_dim:
             x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
             sigma = (var / 2) ** 0.5

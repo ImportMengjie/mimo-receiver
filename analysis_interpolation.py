@@ -78,12 +78,12 @@ def draw_pilot_and_data_nmse(csi_dataloader: CsiDataloader, interpolation_method
 def cmp_model_and_base_method(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_end, snr_step,
                               model_pilot_count, noise_level_conv, noise_channel, noise_dnn, denoising_conv,
                               denoising_channel, kernel_size, use_two_dim, use_true_sigma, only_return_noise_level,
-                              extra='', show_name=None):
+                              extra='', show_name=None, dft_chuck=0):
     model = CBDNetSFModel(csi_dataloader, model_pilot_count, noise_level_conv=noise_level_conv,
                           noise_channel=noise_channel,
                           noise_dnn=noise_dnn, denoising_conv=denoising_conv, denoising_channel=denoising_channel,
                           kernel_size=kernel_size, use_two_dim=use_two_dim, use_true_sigma=use_true_sigma,
-                          only_return_noise_level=only_return_noise_level, extra=extra)
+                          only_return_noise_level=only_return_noise_level, extra=extra, dft_chuck=dft_chuck)
     model = load_model_from_file(model, use_gpu)
     if show_name:
         model.name = show_name
@@ -206,12 +206,12 @@ def cmp_model_use_2dim(csi_dataloader: CsiDataloader, pilot_count, snr_start, sn
 
 def analysis_noise_level(csi_dataloader: CsiDataloader, pilot_count, snr_list, noise_level_conv, noise_channel,
                          noise_dnn, denoising_conv, denoising_channel, kernel_size, use_two_dim, extra='',
-                         show_name=None):
+                         show_name=None, dft_chuck=0):
     model = CBDNetSFModel(csi_dataloader, pilot_count, noise_level_conv=noise_level_conv,
                           noise_channel=noise_channel,
                           noise_dnn=noise_dnn, denoising_conv=denoising_conv, denoising_channel=denoising_channel,
                           kernel_size=kernel_size, use_two_dim=use_two_dim, use_true_sigma=False,
-                          only_return_noise_level=True, extra=extra)
+                          only_return_noise_level=True, extra=extra, dft_chuck=dft_chuck)
     model_method = InterpolationMethodModel(model, config.USE_GPU)
     xp = csi_dataloader.get_pilot_x()
     h = csi_dataloader.get_h(DataType.test)
@@ -226,6 +226,7 @@ def analysis_noise_level(csi_dataloader: CsiDataloader, pilot_count, snr_list, n
         sigma_list.append((sigma, '{}db'.format(snr)))
         sigma_hat_list = model_method.get_sigma_hat(y, h, xp, var, csi_dataloader.rhh)
         sigma_dict[show_name + '-{}db'.format(snr)] = sigma_hat_list
+        sigma_dict_list.append(sigma_dict)
 
         sigma_hat_v = np.array(sigma_hat_list)
         sigma_v = np.full(sigma_hat_v.shape, sigma)
@@ -244,7 +245,7 @@ def analysis_noise_level(csi_dataloader: CsiDataloader, pilot_count, snr_list, n
             error_var, max_value)
         logging.error(text_result)
 
-    draw_point_and_line([i for i in range(0, csi_dataloader.n_t * csi_dataloader.J)], sigma_dict_list, sigma_list,
+    draw_point_and_line([i for i in range(0, csi_dataloader.n_t * h.shape[0])], sigma_dict_list, sigma_list,
                         text_label='', title='sigma-est',
                         save_dir=config.INTERPOLATION_RESULT_IMG)
 
@@ -260,11 +261,11 @@ if __name__ == '__main__':
                               model_pilot_count=31, noise_level_conv=4, noise_channel=32,
                               noise_dnn=(2000, 200, 50), denoising_conv=5, denoising_channel=64, kernel_size=(3, 3),
                               use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
-                              show_name='CBD-SF')
+                              show_name='CBD-SF', dft_chuck=10)
 
     analysis_noise_level(csi_dataloader=csi_dataloader, pilot_count=63, snr_list=[15, 20, 25], noise_level_conv=3,
                          noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=5, denoising_channel=64,
-                         kernel_size=(3, 3), use_two_dim=True, extra='l10', show_name='CBD-SF')
+                         kernel_size=(3, 3), use_two_dim=True, extra='l10', show_name='CBD-SF', dft_chuck=10)
 
     cmp_diff_path_count('data/spatial_mu_ULA_64_32_64_10', path_list=[5, 10, 15, 20], perfect_path=10,
                         pilot_count=63,

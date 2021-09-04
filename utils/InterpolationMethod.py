@@ -23,7 +23,7 @@ class InterpolationMethod(abc.ABC):
         self.pilot_count = torch.sum(self.pilot_idx).item()
         self.only_est_data = only_est_data
         self.extra = extra
-        self.is_denosing = self.pilot_idx == self.n_sc
+        self.is_denosing = self.pilot_count == self.n_sc
 
     @abc.abstractmethod
     def get_key_name(self):
