@@ -103,18 +103,21 @@ def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [Detecti
 
 
 def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step, modulation, layer, is_vector,
-                            extra=''):
+                            extra='', show_name=None):
     model = DetectionNetModel(csi_dataloader, layer_nums=layer, vector=is_vector, is_training=False,
                               modulation=modulation, extra=extra)
     model = load_model_from_file(model, use_gpu)
+    if show_name is not None:
+        model.name = show_name
     detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),
                          DetectionMethodModel(model, modulation, use_gpu)]
     nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
                                            modulation=modulation)
-    draw_line(x, nmse_dict, title='detection-{}'.format(csi_dataloader.__str__()))
+    draw_line(x, nmse_dict, title='detection-{}-{}'.format(modulation, csi_dataloader.__str__()))
 
-    ber_dict, x = analysis_detection_ber(csi_dataloader, detection_methods, 0, 20, 2, modulation=modulation)
-    draw_line(x, ber_dict, title='detection-{}'.format(csi_dataloader.__str__()), ylabel='ber')
+    ber_dict, x = analysis_detection_ber(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
+                                         modulation=modulation)
+    draw_line(x, ber_dict, title='detection-{}-{}'.format(modulation, csi_dataloader.__str__()), ylabel='ber')
 
 
 def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fix_snr, max_layers, modulation, layer,
@@ -123,7 +126,7 @@ def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fi
                               modulation=modulation, extra=extra)
     save_data_name = os.path.join(config.DENOISING_RESULT, '{}.json'.format(model.__str__()))
     if not load_data_from_files or not os.path.exists(save_data_name):
-        model = load_model_from_file(model, use_gpu)
+        # model = load_model_from_file(model, use_gpu)
         nmse_dict, iter_list = analysis_detection_layer(csi_dataloader, [model], fix_snr, max_layers, 'bpsk')
         with open(save_data_name, 'w') as f:
             json.dump({nmse_dict: nmse_dict, 'iter_list': iter_list}, f)
@@ -141,8 +144,8 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_1_l10_11.mat', train_data_radio=0, factor=100)
-    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=2, snr_end=20, snr_step=2, modulation='bpsk',
-                            layer=32, is_vector=True, extra='')
-    cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
-                         modulation='bpsk', layer=32, is_vector=True, extra='')
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', train_data_radio=0.9, factor=1)
+    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=2, snr_end=25, snr_step=2, modulation='qpsk',
+                            layer=32, is_vector=True, extra='', show_name='lcg-net')
+    # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
+    #                      modulation='bpsk', layer=32, is_vector=True, extra='')
