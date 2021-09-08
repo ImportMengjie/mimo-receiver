@@ -46,11 +46,11 @@ if __name__ == '__main__':
     import sys
     import h5py
 
-    J = 100
+    J = 400
     K = 64
-    N_r = 4, 8
-    N_t = 16
-    L_range = (3, 4)
+    N_r = 8, 8
+    N_t = 32
+    L_range = (10, 11)
     low_freq = 2.4e9
     sc_band = 2e4
     arrayant = Arrayant.ULA

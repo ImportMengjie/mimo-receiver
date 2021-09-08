@@ -77,6 +77,8 @@ class CBDNetSFModel(BaseNetModel):
                  denoising_conv=6, denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
                  only_return_noise_level=False, extra='', dft_chuck=0, use_dft_padding=False):
         super().__init__(csiDataloader)
+        assert not (dft_chuck > 0 and use_dft_padding)
+
         self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
         self.pilot_count = torch.sum(self.pilot_idx).item()
         self.noise_level_conv = noise_level_conv
@@ -128,10 +130,12 @@ class CBDNetSFModel(BaseNetModel):
         """
         if self.use_dft_padding:
             x = x.cpu().numpy()
+            x = x[:, self.pilot_idx]
             x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
             x = np.fft.ifft(x, axis=-2)
-            x = np.concatenate((x, np.zeros(x.shape[:2]+(self.n_sc-self.pilot_count, x.shape[-1]))), axis=-2)
+            x = np.concatenate((x, np.zeros(x.shape[:1] + (self.n_sc - self.pilot_count, x.shape[-1]))), axis=-2)
             x = np.fft.fft(x, axis=-2)
+            x = torch.from_numpy(x)
             x = complex2real(x)
             if config.USE_GPU:
                 x = x.cuda()
