@@ -21,3 +21,6 @@ class BaseNetModel(nn.Module):
 
     def basename(self):
         return 'base'
+
+    def get_short_name(self):
+        return 'base'

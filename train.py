@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 
 import torch
@@ -73,11 +75,17 @@ class Train:
                 model_info['epoch'] = 0
                 torch.save(model_info, self.get_save_path())
 
-    def train(self, save=True, reload=True, ext_log: str = ''):
+    def train(self, save=True, reload=True, ext_log: str = '', loss_data_func=None):
         logging.warning('start train:{}'.format(str(self.model)))
         self.losses.clear()
         current_epoch = 0
         test_loss = []
+        test_loss_data = None
+        save_loss_data_path = None
+        if loss_data_func:
+            test_loss_data = []
+            save_loss_data_path = os.path.join(config.RESULT,
+                                               "loss_nmse_{}_{}.json".format(self.model.__str__(), int(time.time())))
         Train.save_per_epoch = self.param.stop_when_test_loss_down_epoch_count
 
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr)
@@ -108,6 +116,11 @@ class Train:
                 optimizer.step()
             self.losses.append(avg_loss.avg)
             avg_loss.reset()
+            if loss_data_func:
+                test_loss_data.append(loss_data_func(self))
+                with open(save_loss_data_path, 'w') as f:
+                    json.dump({'shortname': self.model.get_short_name(), 'basename': self.model.basename(),
+                               'loss': test_loss_data}, f)
             if current_epoch % self.param.log_loss_per_epochs == 0:
                 logging.info(
                     'epoch:{} avg_loss:{};{}'.format(current_epoch, self.losses[-1], ext_log))

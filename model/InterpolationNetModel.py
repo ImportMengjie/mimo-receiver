@@ -122,6 +122,9 @@ class CBDNetSFModel(BaseNetModel):
     def basename(self):
         return 'interpolation'
 
+    def get_short_name(self):
+        return 'CBD-SF'
+
     def forward(self, x, var):
         """
         :param x: batch, N_sc, N_r, 2
