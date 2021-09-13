@@ -1,5 +1,9 @@
+import os
 from typing import List
+
+import PIL.Image
 import numpy as np
+import torch
 
 import utils.config as config
 from loader import CsiDataloader, DataType
@@ -8,6 +12,7 @@ from train import load_model_from_file
 from utils import DenoisingMethodMMSE, DenoisingMethodIdealMMSE, DenoisingMethodLS, draw_point_and_line
 from utils import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel, InterpolationMethodChuck
 from utils import draw_line
+from utils import line_interpolation_hp_pilot, complex2real
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -73,6 +78,71 @@ def draw_pilot_and_data_nmse(csi_dataloader: CsiDataloader, interpolation_method
         draw_line(x, data_nmse_dict,
                   title='comb-interpolation-data{}|{}-{}'.format(n_sc - pilot_count, n_sc, csi_dataloader.__str__()),
                   save_dir=config.INTERPOLATION_RESULT_IMG)
+
+
+def analysis_h_visualization(csi_dataloader: CsiDataloader, snr, model_pilot_count, noise_level_conv, noise_channel,
+                             noise_dnn,
+                             denoising_conv, denoising_channel, kernel_size, use_two_dim, use_true_sigma,
+                             only_return_noise_level,
+                             extra='', dft_chuck=0, use_dft_padding=False):
+    def draw_g(save_path: str, h: torch.Tensor, model: CBDNetSFModel):
+        save_path += '_{}.png'
+        h_rgb = complex2real(h).detach().numpy()
+        h_rgb = 128 / np.ceil(np.abs(h_rgb).max()) * h_rgb + 128
+        h_rgb = np.concatenate((h_rgb, np.zeros((h_rgb.shape[0], h_rgb.shape[1], 1))), axis=-1)
+        img = PIL.Image.fromarray(np.uint8(h_rgb), mode='RGB')
+        img.show()
+        with open(save_path.format('rgb'), 'wb') as f:
+            img.save(f)
+
+        h_grey = h.detach().numpy()
+        h_grey = np.concatenate((np.real(h_grey), np.imag(h_grey)), axis=1)
+        factor = 128 / np.ceil(np.abs(h_grey).max())
+        h_grey = h_grey * factor + 128
+        h_grey = np.round(h_grey)
+        h_grey = 255 - h_grey
+        img = PIL.Image.fromarray(np.uint8(h_grey), mode='L')
+        # img.show(title='g_in')
+        with open(save_path.format('grey'), 'wb') as f:
+            img.save(f)
+
+    model = CBDNetSFModel(csi_dataloader, model_pilot_count, noise_level_conv=noise_level_conv,
+                          noise_channel=noise_channel, noise_dnn=noise_dnn, denoising_conv=denoising_conv,
+                          denoising_channel=denoising_channel, kernel_size=kernel_size, use_two_dim=use_two_dim,
+                          use_true_sigma=use_true_sigma, only_return_noise_level=only_return_noise_level, extra=extra,
+                          dft_chuck=dft_chuck, use_dft_padding=use_dft_padding)
+    model = load_model_from_file(model, use_gpu)
+    model = model.double()
+    xp = csi_dataloader.get_pilot_x()
+    h = csi_dataloader.get_h(DataType.test)
+    J, n_sc, n_r, n_t = h.shape
+    hx = h @ xp
+    n, var = csi_dataloader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
+    y = hx + n
+    h_p = h[:, model.pilot_idx]
+    h_p = DenoisingMethodLS().get_h_hat(y, h_p, xp, var, csi_dataloader.rhh)
+    h_hat = line_interpolation_hp_pilot(h_p, model.pilot_idx, n_sc)
+    h_hat = h_hat.permute(0, 3, 1, 2)
+    save_path = lambda x: os.path.join(config.INTERPOLATION_RESULT_IMG, '{}_{}'.format(model, x))
+    g_true = h[0, :, :, 0]
+    draw_g(save_path('g_true'), g_true, model)
+    g_in = h_hat[0, 0]
+    draw_g(save_path('g_in'), g_in, model)
+    if model.dft_chuck > 0:
+        g_in_dft = np.fft.ifft(g_in.numpy(), axis=0) * model.chuck_array
+        g_in_dft = np.fft.fft(g_in_dft, axis=0)
+        draw_g(save_path('dft_chuck_g_in_dft'), torch.from_numpy(g_in_dft), model)
+    if model.use_dft_padding:
+        g_in_dft = np.fft.ifft(g_in.numpy()[model.pilot_idx,], axis=0)
+        g_in_dft = np.concatenate((g_in_dft, np.zeros((model.n_sc-model.pilot_count, model.n_r))), axis=0)
+        g_in_dft = np.fft.fft(g_in_dft, axis=0)
+        draw_g(save_path('dft_padding_g_in_dft'), torch.from_numpy(g_in_dft), model)
+    g_in = g_in.reshape((-1,) + g_in.shape)
+    var = var[0].squeeze().reshape((1, 1))
+    g_out, _ = model(complex2real(g_in), var)
+    g_out = g_out.squeeze()
+    g_out = g_out[:, :, 0] + g_out[:, :, 1] * 1j
+    draw_g(save_path('g_out'), g_out, model)
 
 
 def cmp_model_and_base_method(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_end, snr_step,
@@ -259,6 +329,11 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', train_data_radio=0.95)
+    analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
+                             model_pilot_count=63, noise_level_conv=4, noise_channel=32,
+                             noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
+                             use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='',
+                             dft_chuck=10, use_dft_padding=False)
 
     cmp_model_and_base_method(csi_dataloader=csi_dataloader, pilot_count=63, snr_start=0, snr_end=30, snr_step=2,
                               model_pilot_count=31, noise_level_conv=4, noise_channel=32,

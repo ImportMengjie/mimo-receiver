@@ -83,7 +83,7 @@ class Train:
         test_loss_data = None
         save_loss_data_path = None
         if loss_data_func:
-            test_loss_data = []
+            test_loss_data = [0]
             save_loss_data_path = os.path.join(config.RESULT,
                                                "loss_nmse_{}_{}.json".format(self.model.__str__(), int(time.time())))
         Train.save_per_epoch = self.param.stop_when_test_loss_down_epoch_count

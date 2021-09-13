@@ -113,11 +113,13 @@ def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, s
                          DetectionMethodModel(model, modulation, use_gpu)]
     nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
                                            modulation=modulation)
-    draw_line(x, nmse_dict, title='detection-{}-{}'.format(modulation, csi_dataloader.__str__()))
+    draw_line(x, nmse_dict, title='detection-{}-{}-nmse'.format(modulation, csi_dataloader.__str__()),
+              save_dir=config.DETECTION_RESULT_IMG)
 
     ber_dict, x = analysis_detection_ber(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
                                          modulation=modulation)
-    draw_line(x, ber_dict, title='detection-{}-{}'.format(modulation, csi_dataloader.__str__()), ylabel='ber')
+    draw_line(x, ber_dict, title='detection-{}-{}-ber'.format(modulation, csi_dataloader.__str__()), ylabel='ber',
+              save_dir=config.DETECTION_RESULT_IMG)
 
 
 def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fix_snr, max_layers, modulation, layer,

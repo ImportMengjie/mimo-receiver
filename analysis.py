@@ -14,7 +14,7 @@ def analysis_loss_nmse():
             shortname = loss_data['shortname']
             basename = loss_data.get('basename')
             loss_list = loss_data['loss']
-            x = [i + 1 for i in range(0, len(loss_list))]
+            x = [i for i in range(0, len(loss_list))]
             draw_line(x, {shortname: loss_list}, title='loss', xlabel='iteration', ylabel='nmse(db)',
                       save_dir=config.RESULT_IMG)
 

@@ -57,7 +57,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     # block
-    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_10_l10_11.mat', snr_range=[5, 25], pilot_count=63,
+    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_400_l10_11.mat', snr_range=[5, 25], pilot_count=63,
                             noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
                             denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
                             only_train_noise_level=False, fix_noise=True, extra='', dft_chuck=10,

@@ -139,3 +139,4 @@ dmypy.json
 quadriga_src
 *.bak
 *.png
+*.back
