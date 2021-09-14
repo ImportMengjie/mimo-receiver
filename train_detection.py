@@ -1,9 +1,10 @@
 from train import *
 
 
-def train_detection_net_3(data_path: str, snr_range: list, layer=32, modulation='bpsk', save=True, reload=True,
+def train_detection_net_3(data_path: str, snr_range: list, layer=32, train_layer_step=None, modulation='bpsk',
+                          save=True, reload=True,
                           retrain=False, extra=''):
-    refinements = [.5, .1, .01]
+    refinements = [.5, .1, .05, .01]
     csi_dataloader = CsiDataloader(data_path, factor=1)
     model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation, extra=extra)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
@@ -16,14 +17,20 @@ def train_detection_net_3(data_path: str, snr_range: list, layer=32, modulation=
 
     dataset = DetectionNetDataset(csi_dataloader, DataType.train, snr_range, modulation)
     train = Train(param, dataset, model, criterion, DetectionNetTee, test_dataset)
-    current_train_layer = layer
+    if train_layer_step is None:
+        train_layer_range = [layer]
+    else:
+        train_layer_range = list(range(1, layer + 1, train_layer_step))
+        if layer not in train_layer_range:
+            train_layer_range.append(layer)
     if not retrain and reload and os.path.exists(train.get_save_path()):
         model_infos = torch.load(train.get_save_path())
         if 'train_state' in model_infos:
             current_train_layer = model_infos['train_state']['train_layer']
             logging.warning('load train state:{}'.format(model_infos['train_state']))
+            train_layer_range = train_layer_range[train_layer_range.index(current_train_layer):]
 
-    for layer_num in range(current_train_layer, model.layer_nums + 1):
+    for layer_num in train_layer_range:
         logging.info('Fine tune layer:{}'.format(layer_num))
         train.param.epochs = epochs
 
@@ -34,12 +41,13 @@ def train_detection_net_3(data_path: str, snr_range: list, layer=32, modulation=
             train.train(save=save, reload=reload,
                         ext_log='snr:{},model:{},lr:{}'.format(-1, model.get_train_state_str(), param.lr))
             train.reset_current_epoch()
+        train.param.lr = learn_rate
 
 
-def train_detection_net_2(data_path: str, snr_range: list, modulation='bpsk', save=True, reload=True, retrain=False):
+def train_detection_net_2(data_path: str, snr_range: list, layer, modulation='bpsk', save=True, reload=True,
+                          retrain=False):
     refinements = [.5, .1, .01]
-    csi_dataloader = CsiDataloader(data_path, factor=10000)
-    layer = 32
+    csi_dataloader = CsiDataloader(data_path, factor=1)
     model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
 
@@ -183,6 +191,9 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
             torch.save(model_infos, Train.get_save_path_from_model(model))
 
 
-if __name__ == '__main':
+if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    train_detection_net_3('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', [5, 20], modulation='qpsk', retrain=True)
+    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 10], layer=32, train_layer_step=None,
+                          modulation='qpsk', retrain=True)
+    # train_detection_net_2('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, modulation='bpsk', retrain=True)
+    # train_detection_net_3('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', [5, 20], modulation='qpsk', retrain=True)

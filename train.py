@@ -164,6 +164,7 @@ def load_model_from_file(model, use_gpu: bool):
         model = model.double().eval()
         if use_gpu:
             model = model.cuda()
+        logging.info('loaded {} model'.format(save_model_path))
     else:
         logging.warning('unable load {} model'.format(save_model_path))
     return model

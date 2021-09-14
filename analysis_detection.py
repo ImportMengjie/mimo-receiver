@@ -58,6 +58,26 @@ def analysis_detection_ber(csi_dataloader: CsiDataloader, detection_method_list:
     return ber_k_v, list(range(snr_start, snr_end, snr_step))
 
 
+def analysis_detection_layer_not_train(csi_dataloader: CsiDataloader, model: DetectionNetModel, fix_snr,
+                                       max_layer, layer_step, modulation, dataType):
+    x, _ = csi_dataloader.get_x(dataType=dataType, modulation=modulation)
+    h = csi_dataloader.get_h(dataType)
+    hx = h @ x
+    n, var = csi_dataloader.noise_snr_range(hx, [fix_snr, fix_snr + 1], one_col=True)
+    y = hx + n
+    model_method = DetectionMethodModel(model, modulation, use_gpu)
+    cg_method = DetectionMethodConjugateGradient(modulation, 1, name_add_iterate=False)
+    mmse_method = DetectionMethodMMSE(modulation)
+    nmse_k_v = {model_method.get_key_name(): [], cg_method.get_key_name(): [], mmse_method.get_key_name():[]}
+    for layer in range(1, max_layer + 1, layer_step):
+        model_method.model.set_test_layer(layer)
+        cg_method.iterate = layer
+        nmse_k_v[model_method.get_key_name()].append(model_method.get_nmse(y, h, x, var))
+        nmse_k_v[cg_method.get_key_name()].append(cg_method.get_nmse(y, h, x, var))
+        nmse_k_v[mmse_method.get_key_name()].append(mmse_method.get_nmse(y, h, x, var))
+    return nmse_k_v, range(1, max_layer + 1, layer_step)
+
+
 def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [DetectionNetModel], fix_snr=30, max_layer=None,
                              modulation='bpsk', dataType=DataType.test):
     if max_layer is None:
@@ -141,12 +161,27 @@ def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fi
               save_dir=config.DETECTION_RESULT_IMG)
 
 
+def cmp_diff_layers_nmse_not_train(csi_dataloader: CsiDataloader, fix_snr, layer_step, modulation, layer, is_vector,
+                                   extra='', show_name=None):
+    model = DetectionNetModel(csi_dataloader, layer_nums=layer, vector=is_vector, is_training=False,
+                              modulation=modulation, extra=extra)
+    model = load_model_from_file(model, use_gpu)
+    if show_name is not None:
+        model.name = show_name
+    nmse_dict, iter_list = analysis_detection_layer_not_train(csi_dataloader, model, fix_snr, layer, layer_step,
+                                                              modulation, dataType=DataType.test)
+    draw_line(iter_list, nmse_dict, title='detection-{}-iter'.format(csi_dataloader), xlabel='iter/layer',
+              save_dir=config.DETECTION_RESULT_IMG, diff_line_markers=True)
+
+
 if __name__ == '__main__':
     import logging
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', train_data_radio=0.9, factor=1)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9, factor=1)
+    cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='bpsk', layer=32, is_vector=True,
+                                  extra='', show_name='lcg-net')
     cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=2, snr_end=25, snr_step=2, modulation='qpsk',
                             layer=32, is_vector=True, extra='', show_name='lcg-net')
     # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,

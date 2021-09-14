@@ -140,3 +140,4 @@ quadriga_src
 *.bak
 *.png
 *.back
+*.json

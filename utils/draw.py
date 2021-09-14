@@ -7,15 +7,30 @@ plt.rcParams['axes.unicode_minus'] = False
 
 line_style_list = ['-', '--', '-.', ':'][::-1]
 
+"""
+'s' : 方块状
+'o' : 实心圆
+'^' : 正三角形
+'v' : 反正三角形
+'+' : 加好
+'*' : 星号
+'x' : x号
+'p' : 五角星
+'1' : 三脚架标记
+'2' : 三脚架标记
+"""
+markers = ['^', 'v', '+', '*', 'o', 's', 'x', 'p', '1', '2']
+
 
 def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, show=True, xlabel='snr(db)',
-              ylabel='nmse(db)', diff_line_style=True):
+              ylabel='nmse(db)', diff_line_style=True, diff_line_markers=False):
     if filter_func is None:
         filter_func = lambda n: True
     i = 0
     for name, y in y_dict.items():
         y = list(map(lambda n: n if filter_func(n) else None, y))
-        plt.plot(x, y, label=name, lw=2, ls=line_style_list[i % len(line_style_list)])
+        marker = markers[i % len(markers)] if diff_line_markers else None
+        plt.plot(x, y, label=name, lw=2, ls=line_style_list[i % len(line_style_list)], marker=marker, mfc='none')
         if diff_line_style:
             i += 1
     if title:

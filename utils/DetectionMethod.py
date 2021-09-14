@@ -99,15 +99,19 @@ class DetectionMethodModel(DetectionMethod):
 
 class DetectionMethodConjugateGradient(DetectionMethod):
 
-    def __init__(self, modulation, iterate):
+    def __init__(self, modulation, iterate, name_add_iterate=True):
         self.iterate = iterate
+        self.name_add_iterate = name_add_iterate
         super().__init__(modulation)
 
     def get_key_name(self):
-        return 'ConjugateGradient-{}th'.format(self.iterate)
+        if self.name_add_iterate:
+            return 'cg-{}th'.format(self.iterate)
+        else:
+            return self.get_key_name_short()
 
     def get_key_name_short(self):
-        return 'ConjugateGradient'
+        return 'cg'
 
     @staticmethod
     def conjugate(s, r, d, A):
