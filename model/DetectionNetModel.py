@@ -14,14 +14,20 @@ import utils.config as config
 
 class Lcg(nn.Module):
 
-    def __init__(self, n_t: int, vector):
+    def __init__(self, n_t: int, svm):
         super().__init__()
-        if vector:
+        self.svm = svm
+        if svm == 'v':
             self.alpha = nn.Parameter(torch.Tensor(2 * n_t, 1))
             self.beta = nn.Parameter(torch.Tensor(2 * n_t, 1))
-        else:
+        elif svm == 'm':
+            self.alpha = nn.Parameter(torch.Tensor(2 * n_t, 2 * n_t))
+            self.beta = nn.Parameter(torch.Tensor(2 * n_t, 2 * n_t))
+        elif svm == 's':
             self.alpha = nn.Parameter(torch.Tensor(1))
             self.beta = nn.Parameter(torch.Tensor(1))
+        else:
+            raise Exception('only s v m not {}'.format(svm))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -29,24 +35,30 @@ class Lcg(nn.Module):
         self.beta.data.zero_()
 
     def forward(self, s, r, d, A):
-        s_next = s + self.alpha * d
-        r_next = r - self.alpha * (A @ d)
-        d_next = r_next + self.beta * d
+        if self.svm == 'm':
+            s_next = s + self.alpha @ d
+            r_next = r - self.alpha @ (A @ d)
+            d_next = r_next + self.beta @ d
+        else:
+            s_next = s + self.alpha * d
+            r_next = r - self.alpha * (A @ d)
+            d_next = r_next + self.beta * d
         return s_next, r_next, d_next
 
 
 class DetectionNetModel(BaseNetModel):
 
-    def __init__(self, csiDataloader: CsiDataloader, layer_nums: int, vector=True, modulation='qpsk', is_training=True, extra=''):
+    def __init__(self, csiDataloader: CsiDataloader, layer_nums: int, svm='s', modulation='qpsk', is_training=True,
+                 extra=''):
         super().__init__(csiDataloader)
         self.n_r = csiDataloader.n_r
         self.n_t = csiDataloader.n_t
-        self.vector = vector
+        self.svm = svm
         self.modulation = modulation
         self.layer_nums = layer_nums
         self.training_layer = layer_nums
         self.is_training = is_training
-        self.lcg_layers = [Lcg(csiDataloader.n_t, vector) for _ in range(self.layer_nums)]
+        self.lcg_layers = [Lcg(csiDataloader.n_t, svm) for _ in range(self.layer_nums)]
         self.lcg_layers = nn.ModuleList(self.lcg_layers)
         self.fix_forward_layer = False
 
@@ -90,9 +102,8 @@ class DetectionNetModel(BaseNetModel):
         return s,
 
     def __str__(self):
-        return '{}-{}_r{}t{}_v{}num{}m{}{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
-                                                 self.vector,
-                                                 self.layer_nums, self.modulation, self.extra)
+        return '{}-{}_r{}t{}_{}num{}m{}{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
+                                                  self.svm, self.layer_nums, self.modulation, self.extra)
 
     def basename(self):
         return 'detection'

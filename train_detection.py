@@ -1,12 +1,12 @@
 from train import *
 
 
-def train_detection_net_3(data_path: str, snr_range: list, layer=32, train_layer_step=None, modulation='bpsk',
+def train_detection_net_3(data_path: str, snr_range: list, layer=32, svm='v', train_layer_step=None, modulation='bpsk',
                           save=True, reload=True,
                           retrain=False, extra=''):
-    refinements = [.5, .1, .05, .01]
+    refinements = [1, .5, .1, .05, .01]
     csi_dataloader = CsiDataloader(data_path, factor=1)
-    model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation, extra=extra)
+    model = DetectionNetModel(csi_dataloader, layer, svm=svm, modulation=modulation, extra=extra)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
 
     criterion = DetectionNetLoss()
@@ -44,11 +44,11 @@ def train_detection_net_3(data_path: str, snr_range: list, layer=32, train_layer
         train.param.lr = learn_rate
 
 
-def train_detection_net_2(data_path: str, snr_range: list, layer, modulation='bpsk', save=True, reload=True,
+def train_detection_net_2(data_path: str, snr_range: list, layer, modulation='bpsk', svm='v', save=True, reload=True,
                           retrain=False):
     refinements = [.5, .1, .01]
     csi_dataloader = CsiDataloader(data_path, factor=1)
-    model = DetectionNetModel(csi_dataloader, layer, True, modulation=modulation)
+    model = DetectionNetModel(csi_dataloader, layer, svm=svm, modulation=modulation)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
 
     criterion = DetectionNetLoss()
@@ -91,7 +91,8 @@ def train_detection_net_2(data_path: str, snr_range: list, layer, modulation='bp
             train.reset_current_epoch()
 
 
-def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', save=True, reload=True, retrain=False):
+def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', svm='v', save=True, reload=True,
+                        retrain=False):
     refinements = [.5, .1, .01]
     lr = 1e-3
 
@@ -119,7 +120,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
         return nmses
 
     csi_dataloader = CsiDataloader(data_path, factor=1)
-    model = DetectionNetModel(csi_dataloader, csi_dataloader.n_t, True, modulation=modulation)
+    model = DetectionNetModel(csi_dataloader, csi_dataloader.n_t, svm=svm, modulation=modulation)
     if retrain and os.path.exists(Train.get_save_path_from_model(model)):
         model_info = torch.load(Train.get_save_path_from_model(model))
         model_info['snr'] = training_snr[0]
@@ -193,7 +194,10 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 10], layer=32, train_layer_step=None,
-                          modulation='qpsk', retrain=True)
-    # train_detection_net_2('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, modulation='bpsk', retrain=True)
-    # train_detection_net_3('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', [5, 20], modulation='qpsk', retrain=True)
+    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, svm='m',
+                          train_layer_step=None,
+                          modulation='bpsk', retrain=True)
+    # train_detection_net_2('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, svm='v', modulation='bpsk',
+    #                       retrain=True)
+    # train_detection_net_3('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', [5, 20], modulation='qpsk', layer=32, svm='v',
+    #                       retrain=True)

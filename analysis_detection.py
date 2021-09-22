@@ -122,9 +122,9 @@ def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [Detecti
     return nmse_k_v, iter_list
 
 
-def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step, modulation, layer, is_vector,
+def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step, modulation, layer, svm,
                             extra='', show_name=None):
-    model = DetectionNetModel(csi_dataloader, layer_nums=layer, vector=is_vector, is_training=False,
+    model = DetectionNetModel(csi_dataloader, layer_nums=layer, svm=svm, is_training=False,
                               modulation=modulation, extra=extra)
     model = load_model_from_file(model, use_gpu)
     if show_name is not None:
@@ -143,8 +143,8 @@ def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, s
 
 
 def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fix_snr, max_layers, modulation, layer,
-                         is_vector, extra=''):
-    model = DetectionNetModel(csi_dataloader, layer_nums=layer, vector=is_vector, is_training=True,
+                         svm, extra=''):
+    model = DetectionNetModel(csi_dataloader, layer_nums=layer, svm=svm, is_training=True,
                               modulation=modulation, extra=extra)
     save_data_name = os.path.join(config.DENOISING_RESULT, '{}.json'.format(model.__str__()))
     if not load_data_from_files or not os.path.exists(save_data_name):
@@ -161,9 +161,9 @@ def cmp_diff_layers_nmse(csi_dataloader: CsiDataloader, load_data_from_files, fi
               save_dir=config.DETECTION_RESULT_IMG)
 
 
-def cmp_diff_layers_nmse_not_train(csi_dataloader: CsiDataloader, fix_snr, layer_step, modulation, layer, is_vector,
+def cmp_diff_layers_nmse_not_train(csi_dataloader: CsiDataloader, fix_snr, layer_step, modulation, layer, svm,
                                    extra='', show_name=None):
-    model = DetectionNetModel(csi_dataloader, layer_nums=layer, vector=is_vector, is_training=False,
+    model = DetectionNetModel(csi_dataloader, layer_nums=layer, svm=svm, is_training=False,
                               modulation=modulation, extra=extra)
     model = load_model_from_file(model, use_gpu)
     if show_name is not None:
@@ -180,9 +180,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9, factor=1)
-    cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='bpsk', layer=32, is_vector=True,
-                                  extra='', show_name='lcg-net')
+    # cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='bpsk', layer=32, svm='v',
+    #                               extra='', show_name='lcg-net')
     cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=2, snr_end=25, snr_step=2, modulation='qpsk',
-                            layer=32, is_vector=True, extra='', show_name='lcg-net')
+                            layer=32, svm='v', extra='', show_name='lcg-net')
     # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
-    #                      modulation='bpsk', layer=32, is_vector=True, extra='')
+    #                      modulation='bpsk', layer=32, svm='v', extra='')
