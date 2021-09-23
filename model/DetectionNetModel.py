@@ -97,9 +97,14 @@ class DetectionNetModel(BaseNetModel):
             s = s.cuda()
         r = b
         d = r
+        S = None
         for i in range(self.training_layer):
             s, r, d = self.lcg_layers[i](s, r, d, A)
-        return s,
+            if S is None:
+                S = s
+            else:
+                S = torch.cat((S, s), dim=-1)
+        return s, S
 
     def __str__(self):
         return '{}-{}_r{}t{}_{}num{}m{}{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
@@ -114,16 +119,15 @@ class DetectionNetModel(BaseNetModel):
 
 class DetectionNetLoss(nn.Module):
 
-    def __init__(self):
+    def __init__(self, use_layer_total_mse=False):
         super(DetectionNetLoss, self).__init__()
-        self.i = 0
+        self.use_layer_total_mse = use_layer_total_mse
 
-    def forward(self, x, x_hat):
-        loss = F.mse_loss(x_hat, x)
-        # if self.i % 1000 == 0:
-        #     nmse = 10 * torch.log10((((x - x_hat) ** 2).sum(-1).sum(-1) / (x ** 2).sum(-1).sum(-1)).mean())
-        #     print(nmse.item(), end='')
-        # self.i += 1
+    def forward(self, x, x_hat, X_hat):
+        if self.use_layer_total_mse:
+            loss = F.mse_loss(X_hat, x.expand(*X_hat.size()))
+        else:
+            loss = F.mse_loss(x_hat, x)
         return loss
 
 
@@ -138,7 +142,7 @@ class DetectionNetTee(Tee):
         return self.A, self.b
 
     def set_model_output(self, outputs):
-        self.x_hat, = outputs
+        self.x_hat, self.X_hat = outputs
 
     def get_loss_input(self):
-        return self.x, self.x_hat
+        return self.x, self.x_hat, self.X_hat

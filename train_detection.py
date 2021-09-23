@@ -2,14 +2,14 @@ from train import *
 
 
 def train_detection_net_3(data_path: str, snr_range: list, layer=32, svm='v', train_layer_step=None, modulation='bpsk',
-                          save=True, reload=True,
+                          use_layer_total_loss=True, save=True, reload=True,
                           retrain=False, extra=''):
-    refinements = [1, .5, .1, .05, .01]
+    refinements = [.5, .1, .05, .01, .001]
     csi_dataloader = CsiDataloader(data_path, factor=1)
     model = DetectionNetModel(csi_dataloader, layer, svm=svm, modulation=modulation, extra=extra)
     test_dataset = DetectionNetDataset(csi_dataloader, DataType.test, snr_range, modulation)
 
-    criterion = DetectionNetLoss()
+    criterion = DetectionNetLoss(use_layer_total_mse=use_layer_total_loss)
     param = TrainParam()
     param.batch_size = 100
     param.use_scheduler = False
@@ -194,9 +194,8 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, svm='m',
-                          train_layer_step=None,
-                          modulation='bpsk', retrain=True)
+    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 25], layer=32, svm='v',
+                          train_layer_step=None, use_layer_total_loss=True, modulation='qpsk', retrain=True)
     # train_detection_net_2('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, svm='v', modulation='bpsk',
     #                       retrain=True)
     # train_detection_net_3('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', [5, 20], modulation='qpsk', layer=32, svm='v',

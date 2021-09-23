@@ -90,7 +90,7 @@ class DetectionMethodModel(DetectionMethod):
         if self.use_gpu:
             A = A.cuda()
             b = b.cuda()
-        x_hat, = self.model(A, b)  # reshape???
+        x_hat, _ = self.model(A, b)  # reshape???
         x_hat = x_hat[:, :, 0:x.shape[-2], :] + x_hat[:, :, x.shape[-2]:, :] * 1j
         if x_hat.is_cuda:
             x_hat = x_hat.cpu()
