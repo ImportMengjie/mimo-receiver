@@ -2,8 +2,7 @@ more off
 close all
 clear all
 
-n_r = 64
-n_t = 32
+n_t = 16
 timeslots = 5
 
 numDrops = 5;                       % Number of random user drops to simulate
@@ -13,15 +12,16 @@ K = n_t;                              % Number of users
 disp('32 users')
 centerFrequency = 2.53e9;            % Center frequency in Hz
 bandwidth = 1e6;                     % Bandwidth in Hz
-numSubcarriers = 1024;               % Number of sub-carriers
-subSampling = 4;                     % Only take every subsampling's sub-carriers
+numSubcarriers = 512;               % Number of sub-carriers
+subSampling = 1;                     % Only take every subsampling's sub-carriers
 n_sc = numSubcarriers/subSampling
 
 antennaHeight = 25;                  % Antenna height of the bse station in m
 antennaSpacing = 1/2;                % Antenna spacing in multiples of the wave length
-M_V = 8;                             % Number of vertical antenna elements
+M_V = 4;                             % Number of vertical antenna elements
 M_H = 4;                             % Number of horizontal antenn elements
 M = 2*M_V*M_H;                       % Total number of antennas (factor 2 due to dual polarization)
+n_r = M
 
 minDistance = 10;                    % Minimum distance from the base station
 maxDistance = 500;                   % Maximum distance from the base station

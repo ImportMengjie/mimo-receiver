@@ -34,7 +34,7 @@ function H = genChannelDrop(par)
     H = zeros(1,par.l.no_rx, par.l.tx_array.no_elements, par.numSubcarriers/par.subSampling, par.sequenceLength);
     for k=1:par.l.no_rx
         h = squeeze(H_raw(k).fr(par.bandwidth, par.numSubcarriers, 1:par.sequenceLength));
-        H(1,k,:,:,:) = h(:,1:par.subSampling:end,:);
+        H(1,k,:,:,:) = h(:,:,:);
     end
     H = {H};
 end

@@ -97,16 +97,21 @@ class InterpolationMethodLine(InterpolationMethod):
 
 class InterpolationMethodChuck(InterpolationMethodLine):
 
-    def __init__(self, n_sc, pilot_count: int, path_count: int, denoisingMethod: DenoisingMethod = None, extra=''):
+    def __init__(self, n_sc, pilot_count: int, path_count: int, denoisingMethod: DenoisingMethod = None,
+                 padding_chuck=False, extra=''):
         super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
         self.chuck_array = np.concatenate((np.ones(path_count), np.zeros(n_sc - path_count)))
         self.chuck_array = self.chuck_array.reshape((-1, 1))
+        self.padding_chuck = padding_chuck
 
     def get_key_name(self):
         if self.is_denosing:
             key_name = 'dft-chuck'
         else:
             key_name = 'dft-padding'
+            if self.padding_chuck:
+                key_name = key_name + '-chuck'
+
         if self.denoisingMethod:
             key_name += '-' + self.denoisingMethod.get_key_name()
         return key_name + self.extra
@@ -144,6 +149,8 @@ class InterpolationMethodChuck(InterpolationMethodLine):
             H_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
                                           np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
                                           h_p_in_time[:, :, split_idx:]), axis=-2)
+            if self.padding_chuck:
+                H_p_in_time = H_p_in_time * self.chuck_array
             H_hat = np.fft.fft(H_p_in_time, axis=-2)
 
             # H_hat_in_time = np.fft.ifft2(H_hat)
@@ -224,5 +231,5 @@ class InterpolationMethodModel(InterpolationMethodLine):
             _, var_hat = self.model(H_hat_batch, var_batch)
             if var_hat.is_cuda:
                 var_hat = var_hat.cpu()
-            sigma_list.extend([s.item()**0.5 for s in var_hat.flatten()])
+            sigma_list.extend([s.item() ** 0.5 for s in var_hat.flatten()])
         return sigma_list

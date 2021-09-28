@@ -180,9 +180,9 @@ if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9, factor=1)
-    cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='bpsk', layer=32, svm='v',
-                                  extra='', show_name='lcg-net')
-    # cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=3, snr_end=25, snr_step=1, modulation='bpsk',
-    #                         layer=32, svm='v', extra='', show_name='lcg-net')
+    # cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='qpsk', layer=32, svm='v',
+    #                               extra='', show_name='lcg-net')
+    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=0, snr_end=25, snr_step=1, modulation='qpsk',
+                            layer=32, svm='v', extra='', show_name='lcg-net')
     # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
     #                      modulation='bpsk', layer=32, svm='v', extra='')

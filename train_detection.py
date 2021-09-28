@@ -194,7 +194,7 @@ def train_detection_net(data_path: str, training_snr: list, modulation='qpsk', s
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 25], layer=32, svm='v',
+    train_detection_net_3('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [0, 10], layer=32, svm='v',
                           train_layer_step=None, use_layer_total_loss=True, modulation='qpsk', retrain=True)
     # train_detection_net_2('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', [5, 20], layer=32, svm='v', modulation='bpsk',
     #                       retrain=True)

@@ -161,11 +161,12 @@ def cmp_model_and_base_method(csi_dataloader: CsiDataloader, pilot_count, snr_st
         InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
         InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, 10, DenoisingMethodIdealMMSE()),
+        InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, 10, DenoisingMethodIdealMMSE(), padding_chuck=True),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, 10, DenoisingMethodMMSE()),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, 20, DenoisingMethodLS()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodMMSE(), True),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE(), True),
-        InterpolationMethodModel(model, use_gpu, pilot_count)
+        # InterpolationMethodModel(model, use_gpu, pilot_count)
     ]
     draw_pilot_and_data_nmse(csi_dataloader, interpolation_methods, snr_start=snr_start, snr_end=snr_end,
                              snr_step=snr_step)
@@ -328,29 +329,29 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_400_l10_11.mat', train_data_radio=0.95)
-    analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
-                             model_pilot_count=63, noise_level_conv=4, noise_channel=32,
-                             noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
-                             use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='',
-                             dft_chuck=10, use_dft_padding=False)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.95)
+    # analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
+    #                          model_pilot_count=63, noise_level_conv=4, noise_channel=32,
+    #                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
+    #                          use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='',
+    #                          dft_chuck=10, use_dft_padding=False)
 
-    cmp_model_and_base_method(csi_dataloader=csi_dataloader, pilot_count=63, snr_start=0, snr_end=30, snr_step=2,
+    cmp_model_and_base_method(csi_dataloader=csi_dataloader, pilot_count=20, snr_start=0, snr_end=30, snr_step=2,
                               model_pilot_count=31, noise_level_conv=4, noise_channel=32,
                               noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
                               use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
                               show_name='CBD-SF', dft_chuck=10)
 
-    analysis_noise_level(csi_dataloader=csi_dataloader, pilot_count=63, snr_list=[15, 20, 25], noise_level_conv=3,
-                         noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
-                         kernel_size=(3, 3), use_two_dim=True, extra='l10', show_name='CBD-SF', dft_chuck=10)
-
-    cmp_diff_path_count('data/spatial_mu_ULA_64_32_64_10', path_list=[5, 10, 15, 20], perfect_path=10,
-                        pilot_count=63,
-                        snr_start=0, snr_end=31, snr_step=5, noise_level_conv=4, noise_channel=32,
-                        noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
-                        use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
-                        show_name='CBD-SF')
+    # analysis_noise_level(csi_dataloader=csi_dataloader, pilot_count=63, snr_list=[15, 20, 25], noise_level_conv=3,
+    #                      noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
+    #                      kernel_size=(3, 3), use_two_dim=True, extra='l10', show_name='CBD-SF', dft_chuck=10)
+    #
+    # cmp_diff_path_count('data/spatial_mu_ULA_64_32_64_10', path_list=[5, 10, 15, 20], perfect_path=10,
+    #                     pilot_count=63,
+    #                     snr_start=0, snr_end=31, snr_step=5, noise_level_conv=4, noise_channel=32,
+    #                     noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
+    #                     use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
+    #                     show_name='CBD-SF')
 
     # cmp_diff_pilot_count(csi_dataloader, [63, 31], snr_start=0, snr_end=30, snr_step=5, model_pilot_count=63,
     #                      noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
