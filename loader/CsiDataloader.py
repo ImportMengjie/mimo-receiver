@@ -8,6 +8,18 @@ import torch
 from h5py import Dataset
 
 
+def qam_n_constellation(mod_n):
+    n = mod_n
+    constellation = np.linspace(int(-np.sqrt(n) + 1), int(np.sqrt(n) - 1), int(np.sqrt(n)))
+    alpha = np.sqrt((constellation ** 2).mean())
+    constellation /= (alpha * np.sqrt(2))
+    array = []
+    for i in range(len(constellation)):
+        for j in range(len(constellation)):
+            array.append(constellation[i] + 1j * constellation[j])
+    return np.array(array)
+
+
 class DataType(Enum):
     train = 1
     test = 2
@@ -47,12 +59,10 @@ def USE_GPU(func):
 
 
 class CsiDataloader:
-    constellations = {
-        'qpsk': np.array(
-            [complex(1 / np.sqrt(2.), 1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), 1 / np.sqrt(2.)),
-             complex(1 / np.sqrt(2.), -1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), -1 / np.sqrt(2.))]),
-        'bpsk': np.array([complex(1, 0), complex(-1, 0)])
-    }
+    constellations = {'qpsk': np.array(
+        [complex(1 / np.sqrt(2.), 1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), 1 / np.sqrt(2.)),
+         complex(1 / np.sqrt(2.), -1 / np.sqrt(2.)), complex(-1 / np.sqrt(2.), -1 / np.sqrt(2.))]),
+        'bpsk': np.array([complex(1, 0), complex(-1, 0)]), '16qam': qam_n_constellation(16)}
     use_gpu = False
 
     use_gpu = torch.cuda.is_available() and use_gpu
