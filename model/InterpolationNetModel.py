@@ -102,6 +102,13 @@ class CBDNetSFModel(BaseNetModel):
 
         self.name = self.__str__()
 
+    def set_path(self, path):
+        assert path <= self.n_sc
+        if self.dft_chuck > 0:
+            self.chuck_array = np.concatenate((np.ones(path), np.zeros(self.n_sc - path)))
+            self.chuck_array = self.chuck_array.reshape((-1, 1))
+            self.dft_chuck = path
+
     def __str__(self):
         name = '{}-{}_r{}t{}K{}p{}_cn{}-{}ch{}-{}dn{}k{}-{}_2dim{}_{}'.format(self.get_dataset_name(),
                                                                               self.__class__.__name__, self.n_r,

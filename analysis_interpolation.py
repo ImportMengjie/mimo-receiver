@@ -222,7 +222,7 @@ def cmp_diff_path_count(data_path_prefix, path_list, perfect_path, pilot_count, 
             if show_name:
                 model.name = show_name
         if not use_dft_padding:
-            model.dft_chuck = path
+            model.set_path(path)
         interpolation_methods = []
         interpolation_method = InterpolationMethodModel(model, use_gpu, pilot_count)
         interpolation_method.extra = '-{}p'.format(path)
