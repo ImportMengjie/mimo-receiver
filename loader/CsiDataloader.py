@@ -31,8 +31,9 @@ class ChannelType(Enum):
     spatial_ULA = 3
     spatial_UPA = 4
     spatial_mu_ULA = 5
-    spatial_mu_UPA = 5
-    unknown = 7
+    spatial_mu_UPA = 6
+    imt_2020 = 7
+    unknown = 8
 
 
 def toNp(tensor: torch.Tensor):
@@ -90,14 +91,20 @@ class CsiDataloader:
         self.train_data_radio = train_data_radio
         self.channel_type = ChannelType.unknown
         self.factor = factor
+        self.path_count = None
         for t in ChannelType:
             if t.name in path:
                 self.channel_type = t
         logging.info('loading {}'.format(path))
         files = h5py.File(path, 'r')
         H = files.get('H')
+        self.path_count = files.get('path_count', None)
         if type(H) is not Dataset:
             H = H.get("value")
+        if self.path_count is not None:
+            if type(self.path_count) is not Dataset:
+                self.path_count = self.path_count.get('value')
+            self.path_count = np.array(self.path_count)
         H = np.array(H).transpose()
         data = CsiDataloader.real2complex(H)
         files.close()
@@ -139,7 +146,7 @@ class CsiDataloader:
         if hx.is_cuda:
             hx = hx.cpu()
         snrs = torch.randint(snr_range[0], snr_range[1], (count, 1))
-        if self.channel_type == ChannelType.gpp or 'spatial' in self.channel_type.name:
+        if self.channel_type == ChannelType.gpp or 'spatial' in self.channel_type.name or 'imt' in self.channel_type.name:
             hx_mean = (torch.abs(hx) ** 2).mean(-1).mean(-1).mean(-1).mean(-1).reshape(1, 1)
             noise_var = hx_mean * (10 ** (-snrs / 10.))
         else:

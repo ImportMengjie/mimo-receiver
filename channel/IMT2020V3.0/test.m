@@ -6,10 +6,15 @@
 clc;  
 clear ;
 
-N_r = 32
-N_t = 16
+N_r = 64
+N_t = 32
 N_sc = 64
 J = 100
+sce = 'RMa_A'
+
+sc_band = 2e4;
+bw = sc_band*N_sc
+fc = 5
 
 path = sprintf('%s',fileparts(mfilename('fullpath')));
 cd(path)
@@ -31,14 +36,14 @@ cd ../
 cd ./ScenarioParameters;
 delete *.mat;
 cd ../
-Input=struct('Sce','RMa_A',... %Set the scenario (InH_x, UMi_x, UMa_x, RMa_x)
-    'C',19,...           %Set the number of Bs
-    'N_user',19,...    %Set the number of subscribers per Bs
-    'fc',6,...          %Set the center frequency (GHz)
-    'AA',[1,1,10,1,1,2.5,2.5,0.5,0.5,102],... %AA=(Mg,Ng,M,N,P,dgH,dgV,dH,dV,downtilt)  BS antenna panel configuration,unit of d and dg is wave length.
+Input=struct('Sce',sce,... %Set the scenario (InH_x, UMi_x, UMa_x, RMa_x)
+    'C',1,...           %Set the number of Bs
+    'N_user',N_t,...    %Set the number of subscribers per Bs
+    'fc',fc,...          %Set the center frequency (GHz)
+    'AA',[1,1,N_r,1,1,2.5,2.5,0.5,0.5,102],... %AA=(Mg,Ng,M,N,P,dgH,dgV,dH,dV,downtilt)  BS antenna panel configuration,unit of d and dg is wave length.
     'sim',1,...         %Set the number of simulations
-    'BW',200,...        %Set the bandwidth of the simulation(MHz)
-     'T',10 );            %Set the number of sampling points of CIR in time domain
+    'BW',bw,...        %Set the bandwidth of the simulation(MHz)
+     'T',J*3);            %Set the number of sampling points of CIR in time domain
 
 layoutpar=Layout(Input.Sce,Input.C,Input.N_user,Input.fc,Input.AA);
 [Pathloss,SF_sigma]=GeneratePathloss(layoutpar);%Generate path loss and shadow fading.
@@ -46,4 +51,3 @@ fixpar=Scenario(Input.fc,layoutpar);%Generate scenario information.
 sigmas= GenerateLSP(layoutpar,fixpar);
 GenerateSSP(layoutpar,fixpar,Input.sim,sigmas);%Generate small-scale parameters.
 GenerateCIR(fixpar,layoutpar,Input.sim,Input.BW,Input.T);%Generate the channel coefficient.
-
