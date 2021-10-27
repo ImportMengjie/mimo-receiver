@@ -7,6 +7,7 @@ import torch
 from utils import config
 from utils import draw_line
 from utils import DenoisingMethodLS, DenoisingMethodMMSE
+from utils import DftChuckTestMethod, VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod
 from loader import CsiDataloader, DataType
 
 import numpy as np
@@ -127,7 +128,8 @@ def analysis_dft_denosing(data_path, fix_snr, max_count, path_start, path_end=No
             min_path_txt += '{}:{};'.format(k, min_path)
 
     title = '{}'.format(csi_loader)
-    draw_line(x, nmse_dict, title="{}-{}db".format(title,fix_snr) + min_path_txt, xlabel='chuck_path', diff_line_markers=False)
+    draw_line(x, nmse_dict, title="{}-{}db".format(title, fix_snr) + min_path_txt, xlabel='chuck_path',
+              diff_line_markers=False)
     # draw_line(x, true_nmse_dict, title="true{}db".format(fix_snr) + min_path_txt, xlabel='chuck_path',
     #           diff_line_markers=True)
     # draw_line(x, noise_mean, xlabel='chuck_path', ylabel='mean', diff_line_markers=True)
@@ -135,12 +137,53 @@ def analysis_dft_denosing(data_path, fix_snr, max_count, path_start, path_end=No
     # draw_line(x, noise_up, xlabel='chuck_path', ylabel='up/total', diff_line_markers=True)
     draw_line(x, chuck_noise, xlabel='chuck_path', ylabel='var', title=title + '-chuck-var', diff_line_markers=True)
     draw_line(x, chuck_noise_fix, xlabel='chuck_path', ylabel='var', title='compare', diff_line_markers=True)
-    draw_line(x, p_value, xlabel='chuck_path', ylabel='p-value', title='{}-p_value'.format(title), diff_line_markers=True)
+    draw_line(x, p_value, xlabel='chuck_path', ylabel='p-value', title='{}-p_value'.format(title),
+              diff_line_markers=True)
+
+
+def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None):
+    csi_loader = CsiDataloader(data_path, train_data_radio=1)
+    xp = csi_loader.get_pilot_x()
+    h = csi_loader.get_h(DataType.train)[:1000//csi_loader.n_t]
+    hx = h @ xp
+    dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20), SWTestMethod(csi_loader.n_r, 20),
+                           KSTestMethod(csi_loader.n_r, 20), ADTestMethod(csi_loader.n_r, 20, 3), NormalTestMethod(csi_loader.n_r, 20)]
+
+    snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
+    snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
+    snr_total_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
+
+    get_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
+    for snr in range(snr_start, snr_end, snr_step):
+        n, var = csi_loader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
+        y = hx + n
+        h_hat = DenoisingMethodLS().get_h_hat(y, h, xp, var, csi_loader.rhh)
+        g_hat = h_hat.permute(0, 3, 1, 2).numpy().reshape(-1, csi_loader.n_sc, csi_loader.n_r)
+        g_hat_idft = np.fft.ifft(g_hat, axis=-2)
+        for i in range(g_hat.shape[0]):
+            i_g_hat_idft = g_hat_idft[i]
+            i_g_hat_idft = np.concatenate((i_g_hat_idft.real, i_g_hat_idft.imag), axis=1)
+            for dft_idx in range(len(dft_chuck_test_list)):
+                snr_total_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
+                path_hat = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft)
+                if path_hat != get_path_count(i):
+                    snr_error_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
+                else:
+                    snr_right_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
+
+    draw_dict = {}
+    for dft_idx in range(len(dft_chuck_test_list)):
+        right_est_count = np.array(snr_right_est_count[dft_idx])
+        error_est_count = np.array(snr_error_est_count[dft_idx])
+        total_est_count = np.array(snr_total_est_count[dft_idx])
+        draw_dict[dft_chuck_test_list[dft_idx].name()] = right_est_count / total_est_count * 100
+    draw_line(list(range(snr_start, snr_end, snr_step)), draw_dict, 'path-est-cmp', diff_line_markers=True, ylabel='%')
 
 
 if __name__ == '__main__':
     # analysis_loss_nmse()
-    # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=10, max_count=3, path_start=1,
+    # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)
-    analysis_dft_denosing(data_path="data/3gpp_mu_32_16_512_5_5.mat", fix_snr=35, max_count=3, path_start=1,
-                          path_end=30)
+    cmp_diff_test_method(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=15, snr_step=1)
+    # cmp_diff_test_method(data_path='data/spatial_mu_ULA_32_16_64_10_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
+    #                      fix_path=10)

@@ -9,7 +9,7 @@ clear ;
 N_r = 64
 N_t = 32
 N_sc = 64
-J = 100
+J = 400
 sce = 'RMa_A'
 
 sc_band = 2e4;
@@ -43,7 +43,7 @@ Input=struct('Sce',sce,... %Set the scenario (InH_x, UMi_x, UMa_x, RMa_x)
     'AA',[1,1,N_r,1,1,2.5,2.5,0.5,0.5,102],... %AA=(Mg,Ng,M,N,P,dgH,dgV,dH,dV,downtilt)  BS antenna panel configuration,unit of d and dg is wave length.
     'sim',1,...         %Set the number of simulations
     'BW',bw,...        %Set the bandwidth of the simulation(MHz)
-     'T',J*3);            %Set the number of sampling points of CIR in time domain
+     'T',J*2);            %Set the number of sampling points of CIR in time domain
 
 layoutpar=Layout(Input.Sce,Input.C,Input.N_user,Input.fc,Input.AA);
 [Pathloss,SF_sigma]=GeneratePathloss(layoutpar);%Generate path loss and shadow fading.

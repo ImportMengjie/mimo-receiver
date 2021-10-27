@@ -27,3 +27,6 @@ from utils.InterpolationMethod import InterpolationMethodChuck
 from utils.InterpolationMethod import InterpolationMethodModel
 
 from utils.model import Padding, ConvReluBlock, ConvBnReluBlock
+
+from utils.DftChuckTestMethod import DftChuckTestMethod
+from utils.DftChuckTestMethod import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod
