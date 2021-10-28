@@ -144,14 +144,16 @@ def analysis_dft_denosing(data_path, fix_snr, max_count, path_start, path_end=No
 def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None):
     csi_loader = CsiDataloader(data_path, train_data_radio=1)
     xp = csi_loader.get_pilot_x()
-    h = csi_loader.get_h(DataType.train)[:1000//csi_loader.n_t]
+    h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
     hx = h @ xp
     dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20), SWTestMethod(csi_loader.n_r, 20),
-                           KSTestMethod(csi_loader.n_r, 20), ADTestMethod(csi_loader.n_r, 20, 3), NormalTestMethod(csi_loader.n_r, 20)]
+                           KSTestMethod(csi_loader.n_r, 20), ADTestMethod(csi_loader.n_r, 20, significance_level=1),
+                           NormalTestMethod(csi_loader.n_r, 20)]
 
     snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
     snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
     snr_total_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
+    snr_error_over_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
 
     get_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
     for snr in range(snr_start, snr_end, snr_step):
@@ -163,27 +165,36 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None)
         for i in range(g_hat.shape[0]):
             i_g_hat_idft = g_hat_idft[i]
             i_g_hat_idft = np.concatenate((i_g_hat_idft.real, i_g_hat_idft.imag), axis=1)
+            true_var = var[i // csi_loader.n_t, 0, 0].item() / 2 / csi_loader.n_sc
             for dft_idx in range(len(dft_chuck_test_list)):
                 snr_total_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
-                path_hat = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft)
+                path_hat = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, true_var)
                 if path_hat != get_path_count(i):
                     snr_error_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
+                    if path_hat > get_path_count(i):
+                        snr_error_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
                 else:
                     snr_right_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
 
-    draw_dict = {}
+    draw_right_dict = {}
+    draw_over_error_dict = {}
     for dft_idx in range(len(dft_chuck_test_list)):
         right_est_count = np.array(snr_right_est_count[dft_idx])
         error_est_count = np.array(snr_error_est_count[dft_idx])
         total_est_count = np.array(snr_total_est_count[dft_idx])
-        draw_dict[dft_chuck_test_list[dft_idx].name()] = right_est_count / total_est_count * 100
-    draw_line(list(range(snr_start, snr_end, snr_step)), draw_dict, 'path-est-cmp', diff_line_markers=True, ylabel='%')
+        over_est_count = np.array(snr_error_over_count[dft_idx])
+        draw_over_error_dict[dft_chuck_test_list[dft_idx].name()] = over_est_count / error_est_count * 100
+        draw_right_dict[dft_chuck_test_list[dft_idx].name()] = right_est_count / total_est_count * 100
+    draw_line(list(range(snr_start, snr_end, snr_step)), draw_right_dict, '{}-path-est-cmp'.format(csi_loader),
+              diff_line_markers=True, ylabel='%')
+    draw_line(list(range(snr_start, snr_end, snr_step)), draw_over_error_dict,
+              '{}-over-path-est-cmp'.format(csi_loader), diff_line_markers=True, ylabel='%')
 
 
 if __name__ == '__main__':
     # analysis_loss_nmse()
     # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)
-    cmp_diff_test_method(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=15, snr_step=1)
-    # cmp_diff_test_method(data_path='data/spatial_mu_ULA_32_16_64_10_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
+    cmp_diff_test_method(data_path='data/imt_2020_16_8_64_400.mat', snr_start=0, snr_end=15, snr_step=1)
+    # cmp_diff_test_method(data_path='data/spatial_mu_ULA_64_32_64_100_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
     #                      fix_path=10)
