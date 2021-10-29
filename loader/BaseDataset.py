@@ -18,3 +18,7 @@ class BaseDataset(torch.utils.data.Dataset, abc.ABC):
     @abc.abstractmethod
     def cuda(self):
         pass
+
+    @abc.abstractmethod
+    def reload(self):
+        pass

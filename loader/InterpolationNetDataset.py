@@ -39,9 +39,10 @@ class InterpolationNetDataset(BaseDataset):
         var = self.var[random.randint(0, self.var.shape[0] - 1), 0, 0, 0]
 
         H = self.h[n_j]
-        y = self.hx[n_j] + self.csiDataloader.get_noise_from_half_sigma((var/2)**0.5, count=self.pilot_count)
+        y = self.hx[n_j] + self.csiDataloader.get_noise_from_half_sigma((var / 2) ** 0.5, count=self.pilot_count)
         h_pilot_ls = y @ self.xp_inv
-        H_interpolation = line_interpolation_hp_pilot(h_pilot_ls.reshape((1, ) + h_pilot_ls.shape), self.pilot_idx, self.csiDataloader.n_sc, True)
+        H_interpolation = line_interpolation_hp_pilot(h_pilot_ls.reshape((1,) + h_pilot_ls.shape), self.pilot_idx,
+                                                      self.csiDataloader.n_sc, True)
         H_interpolation.squeeze_()
         H = complex2real(H[:, :, n_t_user])
         H_interpolation = complex2real(H_interpolation[:, :, n_t_user])
@@ -50,6 +51,9 @@ class InterpolationNetDataset(BaseDataset):
             H_interpolation = to_cuda(H_interpolation)
             var = to_cuda(var)
         return H_interpolation, H, var.reshape(-1)
+
+    def reload(self):
+        pass
 
 
 if __name__ == '__main__':

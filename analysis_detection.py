@@ -68,7 +68,7 @@ def analysis_detection_layer_not_train(csi_dataloader: CsiDataloader, model: Det
     model_method = DetectionMethodModel(model, modulation, use_gpu)
     cg_method = DetectionMethodConjugateGradient(modulation, 1, name_add_iterate=False)
     mmse_method = DetectionMethodMMSE(modulation)
-    nmse_k_v = {model_method.get_key_name(): [], cg_method.get_key_name(): [], mmse_method.get_key_name():[]}
+    nmse_k_v = {model_method.get_key_name(): [], cg_method.get_key_name(): [], mmse_method.get_key_name(): []}
     for layer in range(1, max_layer + 1, layer_step):
         model_method.model.set_test_layer(layer)
         cg_method.iterate = layer

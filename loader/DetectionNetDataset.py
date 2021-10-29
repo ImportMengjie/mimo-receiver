@@ -50,6 +50,9 @@ class DetectionNetDataset(BaseDataset):
             x = to_cuda(x)
         return A, b, x
 
+    def reload(self):
+        pass
+
 
 if __name__ == '__main__':
     csiDataloader = CsiDataloader('../data/h_16_16_64_1.mat')

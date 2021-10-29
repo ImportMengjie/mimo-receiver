@@ -105,7 +105,7 @@ if __name__ == '__main__':
 
     denoising_model = [model]
     sigma_list, sigma_dict_list, x, text_label = analysis_denoising_noise_level(csi_dataloader, denoising_model,
-                                                                               [15, 20])
+                                                                                [15, 20])
     draw_point_and_line(x, sigma_dict_list, sigma_list, text_label=text_label, title='sigma-est',
                         save_dir=config.DENOISING_RESULT_IMG)
 

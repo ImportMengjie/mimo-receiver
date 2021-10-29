@@ -134,7 +134,7 @@ def analysis_h_visualization(csi_dataloader: CsiDataloader, snr, model_pilot_cou
         draw_g(save_path('dft_chuck_g_in_dft'), torch.from_numpy(g_in_dft), model)
     if model.use_dft_padding:
         g_in_dft = np.fft.ifft(g_in.numpy()[model.pilot_idx,], axis=0)
-        g_in_dft = np.concatenate((g_in_dft, np.zeros((model.n_sc-model.pilot_count, model.n_r))), axis=0)
+        g_in_dft = np.concatenate((g_in_dft, np.zeros((model.n_sc - model.pilot_count, model.n_r))), axis=0)
         g_in_dft = np.fft.fft(g_in_dft, axis=0)
         draw_g(save_path('dft_padding_g_in_dft'), torch.from_numpy(g_in_dft), model)
     g_in = g_in.reshape((-1,) + g_in.shape)

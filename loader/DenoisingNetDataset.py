@@ -43,6 +43,9 @@ class DenoisingNetDataset(BaseDataset):
             sigma = to_cuda(sigma)
         return h_ls, h, sigma
 
+    def reload(self):
+        pass
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
