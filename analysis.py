@@ -146,14 +146,22 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None)
     xp = csi_loader.get_pilot_x()
     h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
     hx = h @ xp
-    dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20), SWTestMethod(csi_loader.n_r, 20),
-                           KSTestMethod(csi_loader.n_r, 20), ADTestMethod(csi_loader.n_r, 20, significance_level=1),
+    dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20),
+                           SWTestMethod(csi_loader.n_r, 20),
+                           KSTestMethod(csi_loader.n_r, 20),
+                           ADTestMethod(csi_loader.n_r, 20, significance_level=4),
                            NormalTestMethod(csi_loader.n_r, 20)]
 
-    snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
-    snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
-    snr_total_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
-    snr_error_over_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for i in dft_chuck_test_list]
+    # test ad-test diff significance level
+    # dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20),
+    #                        ADTestMethod(csi_loader.n_r, 20, significance_level=4, full_name=True),
+    #                        ADTestMethod(csi_loader.n_r, 20, significance_level=1, full_name=True),
+    #                        ]
+
+    snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
+    snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
+    snr_total_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
+    snr_error_over_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
 
     get_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
     for snr in range(snr_start, snr_end, snr_step):
