@@ -47,10 +47,10 @@ class PathEstNetDataset(BaseDataset):
         idx_row = idx % self.row_count_per_h + self.path_range[0]
         idx_h = idx // self.row_count_per_h
         right_path = self.get_path_count(idx_h)
-        right_y = 1 if right_path == (idx_row + 1) else 0
+        right_y = 1 if right_path >= (idx_row + 1) else 0
         g = self.g_hat_idft[idx_h]
         g_row = g[idx_row].flatten()
-        right_y = torch.tensor(right_y)
+        right_y = torch.squeeze(torch.tensor(right_y)).double()
         idx_row = torch.tensor(idx_row)
         right_path = torch.tensor(right_path)
         true_var = self.var[idx_h // self.csiDataloader.n_t].flatten() / 2 / self.csiDataloader.n_sc
@@ -62,4 +62,5 @@ class PathEstNetDataset(BaseDataset):
             true_var = to_cuda(true_var)
             right_path = to_cuda(right_path)
             g_row = to_cuda(g_row)
+            est_var = to_cuda(est_var)
         return g, idx_row, g_row, right_y, right_path, true_var, est_var
