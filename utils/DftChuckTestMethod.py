@@ -18,7 +18,7 @@ class TestMethod(Enum):
 class DftChuckTestMethod(abc.ABC):
 
     def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False, min_path=5):
+                 full_name=False, min_path=0):
         self.testMethod = testMethod
         self.n_r = n_r
         self.n_sc = n_sc
@@ -79,7 +79,7 @@ class DftChuckTestMethod(abc.ABC):
         if self.first:
             logging.warning('get zero path in {}'.format(self.name()))
             self.first = False
-        return 0, probability_list
+        return self.min_path, probability_list
 
     @abc.abstractmethod
     def test_one_row(self, idft_row: np.ndarray, est_var, true_var, i, idft_g) -> (bool, any):

@@ -224,8 +224,9 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None,
                     i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
                     i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2)
                     path_mse_dict[path_hat] = (np.abs(i_g_hat_chuck - i_g) ** 2).sum(-1).sum(-1) / (
-                                np.abs(i_g) ** 2).sum(-1).sum(-1)
+                            np.abs(i_g) ** 2).sum(-1).sum(-1)
                 return path_mse_dict[path_hat]
+
             if draw_nmse:
                 ls_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(csi_loader.n_sc)
                 dft_chuck_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(get_path_count(i))
@@ -262,15 +263,100 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None,
     draw_line(list(range(snr_start, snr_end, snr_step)), draw_over_error_dict,
               '{}-over-path-est-cmp'.format(csi_loader), diff_line_markers=True, ylabel='%')
     if draw_nmse:
-        draw_nmse_dict['ls'] = 10*np.log10(np.array(ls_mse) / g_len)
-        draw_nmse_dict['dft_chuck'] = 10*np.log10(np.array(dft_chuck_mse) / g_len)
+        draw_nmse_dict['ls'] = 10 * np.log10(np.array(ls_mse) / g_len)
+        draw_nmse_dict['dft_chuck'] = 10 * np.log10(np.array(dft_chuck_mse) / g_len)
         draw_line(list(range(snr_start, snr_end, snr_step)), draw_nmse_dict,
                   '{}-path-est-nmse-cmp'.format(csi_loader), diff_line_markers=True, )
+
+
+def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=None, ):
+    csi_loader = CsiDataloader(data_path, train_data_radio=1)
+    xp = csi_loader.get_pilot_x()
+    h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
+    hx = h @ xp
+    cp = 20
+    h_len = h.shape[0] * csi_loader.n_sc
+
+    model = DnnPathEst(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+                       dnn_list=[256, 256, 128, 128, 64, 32],
+                       extra='')
+    model = load_model_from_file(model, use_gpu)
+
+    model.name = 'dnn'
+    dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model,
+                                                 testMethod=TestMethod.one_row),
+                           VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
+                                         testMethod=TestMethod.one_row)]
+    snr_h_mse = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
+    snr_h_ls_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
+    snr_h_dft_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
+
+    get_true_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
+    for snr in range(snr_start, snr_end, snr_step):
+        n, var = csi_loader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
+        y = hx + n
+        h_hat = DenoisingMethodLS().get_h_hat(y, h, xp, var, csi_loader.rhh)
+        g_hat = h_hat.permute(0, 3, 1, 2).numpy()
+        g = h.permute(0, 3, 1, 2).numpy()
+        g_hat_idft = np.fft.ifft(g_hat, axis=-2)
+        for j in range(g.shape[0]):
+            j_h_chuck = [None for _ in range(len(dft_chuck_test_list) + 2)]
+            true_var = var[j, 0, 0].item() / 2
+            for m in range(g.shape[1]):
+                i_g_hat = g_hat[j][m]
+                i_g = g[j][m]
+                i_g_hat_idft = g_hat_idft[j][m]
+                path_g_dict = {}
+
+                def get_chuck_g(path_hat: int):
+                    if path_hat not in path_g_dict:
+                        chuck_array = np.concatenate((np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
+                            (-1, 1))
+                        i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
+                        i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2)
+                        path_g_dict[path_hat] = i_g_hat_chuck.reshape((1,) + i_g_hat_chuck.shape)
+                    return path_g_dict[path_hat]
+
+                def put_in_j_h_chuck(path_hat, idx):
+                    if j_h_chuck[idx] is None:
+                        j_h_chuck[idx] = get_chuck_g(path_hat)
+                    else:
+                        j_h_chuck[idx] = np.concatenate((j_h_chuck[idx], get_chuck_g(path_hat)), axis=0)
+
+                # ls
+                put_in_j_h_chuck(csi_loader.n_sc, -1)
+                # dft chuck
+                put_in_j_h_chuck(get_true_path_count(j * csi_loader.n_t + m), -2)
+                for dft_idx in range(len(dft_chuck_test_list)):
+                    path_hat, p_list = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat, true_var)
+                    put_in_j_h_chuck(path_hat, dft_idx)
+
+            true_h = h[j].permute(2, 0, 1).numpy()
+
+            def calc_mse(idx):
+                return ((np.abs(j_h_chuck[idx] - true_h) ** 2).sum(0).sum(-1) / (np.abs(true_h) ** 2).sum(0).sum(
+                    -1)).sum().item()
+
+            for dft_idx in range(len(dft_chuck_test_list)):
+                snr_h_mse[dft_idx][(snr - snr_start) // snr_step] += calc_mse(dft_idx)
+            snr_h_ls_mse[(snr - snr_start) // snr_step] += calc_mse(-1)
+            snr_h_dft_mse[(snr - snr_start) // snr_step] += calc_mse(-2)
+
+    draw_h_nmse_dict = {}
+    for dft_idx in range(len(dft_chuck_test_list)):
+        mse_sum = np.array(snr_h_mse[dft_idx])
+        draw_h_nmse_dict[dft_chuck_test_list[dft_idx].name()] = 10 * np.log10(mse_sum / h_len)
+
+    draw_h_nmse_dict['ls'] = 10 * np.log10(np.array(snr_h_ls_mse) / h_len)
+    draw_h_nmse_dict['dft_chuck'] = 10 * np.log10(np.array(snr_h_dft_mse) / h_len)
+
+    draw_line(list(range(snr_start, snr_end, snr_step)), draw_h_nmse_dict,
+              '{}-path-est-h-nmse-cmp'.format(csi_loader), diff_line_markers=True, )
 
 
 if __name__ == '__main__':
     # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)
-    cmp_diff_test_method(data_path='data/imt_2020_64_32_64_400.mat', snr_start=2, snr_end=15, snr_step=1)
+    cmp_diff_test_method_nmse(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=15, snr_step=2)
     # cmp_diff_test_method(data_path='data/spatial_mu_ULA_64_32_64_100_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
     #                      fix_path=10)
