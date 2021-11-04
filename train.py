@@ -75,7 +75,7 @@ class Train:
                 model_info['epoch'] = 0
                 torch.save(model_info, self.get_save_path())
 
-    def train(self, save=True, reload=True, ext_log: str = '', loss_data_func=None):
+    def train(self, save=True, reload=True, ext_log: str = '', loss_data_func=None, weight_decay=0.):
         logging.warning('start train:{}'.format(str(self.model)))
         self.losses.clear()
         current_epoch = 0
@@ -88,7 +88,8 @@ class Train:
                                                "loss_nmse_{}_{}.json".format(self.model.__str__(), int(time.time())))
         Train.save_per_epoch = self.param.stop_when_test_loss_down_epoch_count
 
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()), lr=self.param.lr,
+                                     weight_decay=weight_decay)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.param.epochs)
         model_info = None
         if reload and os.path.exists(self.get_save_path()):

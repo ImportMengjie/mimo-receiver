@@ -18,7 +18,7 @@ class TestMethod(Enum):
 class DftChuckTestMethod(abc.ABC):
 
     def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
+                 full_name=False, min_path=5):
         self.testMethod = testMethod
         self.n_r = n_r
         self.n_sc = n_sc
@@ -28,34 +28,45 @@ class DftChuckTestMethod(abc.ABC):
         self.use_true_var = use_true_var
         self.full_name = full_name
         self.first = True
+        self.update_est_var = False
+        self.min_path = min_path
 
     def get_path_count(self, g_hat_idft: np.ndarray, g_hat, true_var) -> (int, any):
         probability_list = []
         if self.testMethod == TestMethod.one_row:
             g_hat_idft = np.concatenate((g_hat_idft.real, g_hat_idft.imag), axis=1)
-            for i in range(self.cp - 1, 0, -1):
+            est_var = (g_hat_idft[self.cp:] ** 2).mean()
+            true_var = true_var / self.n_sc
+            for i in range(self.cp - 1, self.min_path, -1):
                 idft_row = g_hat_idft[i].flatten()
-                est_var = (g_hat_idft[i + 1:] ** 2).mean()
-                true_var = true_var / self.n_sc
+                if self.update_est_var:
+                    est_var = (g_hat_idft[i + 1:] ** 2).mean()
                 is_path, probability = self.test_one_row(idft_row, est_var, true_var, i, g_hat_idft)
                 probability_list.append(probability)
                 if is_path:
                     return i + 1, probability_list
         elif self.testMethod == TestMethod.whole_noise:
             g_hat_idft = np.concatenate((g_hat_idft.real, g_hat_idft.imag), axis=1)
-            for i in range(self.cp - 1, 0, -1):
-                est_var = (g_hat_idft[i + 1:] ** 2).mean()
+            est_var = (g_hat_idft[self.cp:] ** 2).mean()
+            true_var = true_var / self.n_sc
+            for i in range(self.cp - 1, self.min_path, -1):
+                if self.update_est_var:
+                    est_var = (g_hat_idft[i + 1:] ** 2).mean()
                 idft_rows = g_hat_idft[i:].flatten()
-                true_var = true_var / self.n_sc
                 is_path, probability = self.test_whole_noise(idft_rows, est_var, true_var, i, g_hat_idft)
                 probability_list.append(probability)
                 if is_path:
                     return i + 1, probability_list
         elif self.testMethod == TestMethod.dft_diff:
             chuck_array = np.concatenate((np.ones(self.cp), np.zeros(self.n_sc - self.cp))).reshape((-1, 1))
-            for i in range(self.cp - 1, 0, -1):
-                est_var = (np.abs(g_hat_idft[i + 1:]) ** 2).mean() * (self.n_sc - i) / 2
-                true_var = true_var * (self.n_sc - i) / self.n_sc
+            est_cp_var = (np.abs(g_hat_idft[self.cp:]) ** 2).mean()
+            true_var_o = true_var
+            for i in range(self.cp - 1, self.min_path, -1):
+                if self.update_est_var:
+                    est_var = (np.abs(g_hat_idft[i + 1:]) ** 2).mean() * (self.n_sc - i) / 2
+                else:
+                    est_var = est_cp_var * (self.n_sc - i) / 2
+                true_var = true_var_o * (self.n_sc - i) / self.n_sc
                 chuck_array[i] = 0
                 idft_g_chuck = g_hat_idft * chuck_array
                 g_chuck = np.fft.fft(idft_g_chuck, axis=0)

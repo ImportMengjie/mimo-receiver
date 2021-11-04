@@ -4,7 +4,7 @@ from loader import PathEstNetDataset
 
 
 def train_pathest_net(data_path: str, snr_range: list, path_range: list, add_var=True, use_true_var=False,
-                      dnn_list=None, fix_path=None, extra='', retrain=False):
+                      dnn_list=None, fix_path=None, extra='', reload=True):
     csi_dataloader = CsiDataloader(data_path, train_data_radio=0.9)
     dataset = PathEstNetDataset(csiDataloader=csi_dataloader, dataType=DataType.train, snr_range=snr_range,
                                 path_range=path_range, fix_path=fix_path)
@@ -21,14 +21,14 @@ def train_pathest_net(data_path: str, snr_range: list, path_range: list, add_var
     param.log_loss_per_epochs = 1
 
     train = Train(param, dataset, model, criterion, PathEstNetTee, test_dataset)
-    train.train(reload=retrain)
+    train.train(reload=reload, weight_decay=0.)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    train_pathest_net(data_path='data/imt_2020_64_32_64_400.mat', snr_range=[0, 11], path_range=[3, 16], add_var=True,
-                      use_true_var=False, dnn_list=[256, 256, 256, 128, 64, 32], fix_path=None, extra='',
-                      retrain=True)
+    train_pathest_net(data_path='data/imt_2020_64_32_64_400.mat', snr_range=[1, 15], path_range=[1, 20], add_var=True,
+                      use_true_var=False, dnn_list=[256, 256, 128, 128, 64, 32, ], fix_path=None, extra='',
+                      reload=False)
     # train_pathest_net(data_path='data/imt_2020_64_32_64_400.mat', snr_range=[0, 11], path_range=[3, 16], add_var=True,
     #                   use_true_var=False, dnn_list=None, fix_path=None, extra='',
     #                   retrain=True)
