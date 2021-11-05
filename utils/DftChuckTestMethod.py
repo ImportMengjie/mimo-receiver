@@ -1,18 +1,12 @@
 import abc
 import logging
-from enum import Enum
 
 import numpy as np
 import scipy.stats
 import torch
 
-from model import DnnPathEst
-
-
-class TestMethod(Enum):
-    one_row = 1
-    whole_noise = 2
-    dft_diff = 3
+from model import PathEstBaseModel
+from utils import TestMethod
 
 
 class DftChuckTestMethod(abc.ABC):
@@ -98,7 +92,7 @@ class DftChuckTestMethod(abc.ABC):
         return 'abs_dft_chuck'
 
 
-class DnnModelPathestMethod(DftChuckTestMethod):
+class ModelPathestMethod(DftChuckTestMethod):
 
     def test_one_row(self, idft_row: np.ndarray, est_var, true_var, i, idft_g) -> (bool, any):
         idft_g = torch.from_numpy(idft_g.reshape((1,) + idft_g.shape))
@@ -110,15 +104,15 @@ class DnnModelPathestMethod(DftChuckTestMethod):
         raise Exception('not impl test_whole_noise')
 
     def test_dft_diff(self, dft_diff: np.ndarray, est_var, true_var, i, dft_chuck_g) -> (bool, any):
-        raise Exception('not impl test_dft_diff')
+        dft_diff = torch.from_numpy(dft_diff.reshape((1,) + dft_diff.shape))
+        p, = self.model(dft_diff, 0, torch.tensor(true_var), torch.tensor(est_var))
+        return p >= 0.5, p
 
     def name(self):
         return self.model.name
 
-    def __init__(self, n_r, n_sc, cp, model: DnnPathEst, use_true_var=False,
-                 testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, 0.05, use_true_var, testMethod, full_name)
+    def __init__(self, n_r, n_sc, cp, model: PathEstBaseModel, use_true_var=False, full_name=False):
+        super().__init__(n_r, n_sc, cp, 0.05, use_true_var, model.test_method, full_name)
         self.model = model
         model.use_true_var = use_true_var
 

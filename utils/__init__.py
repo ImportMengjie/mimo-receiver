@@ -4,6 +4,7 @@ from utils.common import conj_t
 from utils.common import line_interpolation_hp_pilot
 from utils.common import get_interpolation_pilot_idx
 from utils.common import to_cuda, print_parameter_number
+from utils.common import TestMethod
 
 import utils.config
 
@@ -30,4 +31,4 @@ from utils.model import Padding, ConvReluBlock, ConvBnReluBlock
 
 from utils.DftChuckTestMethod import DftChuckTestMethod
 from utils.DftChuckTestMethod import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod
-from  utils.DftChuckTestMethod import DnnModelPathestMethod
+from  utils.DftChuckTestMethod import ModelPathestMethod

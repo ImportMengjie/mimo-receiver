@@ -11,6 +11,10 @@ from model.InterpolationNetModel import CBDNetSFModel
 from model.DetectionNetModel import DetectionNetModel
 from model.DetectionNetModel import DetectionNetLoss
 from model.DetectionNetModel import DetectionNetTee
-from model.PathEstNetModel import DnnPathEst
-from model.PathEstNetModel import PathEstNetLoss
-from model.PathEstNetModel import PathEstNetTee
+from model.PathEstNetModel import PathEstDnn
+from model.PathEstNetModel import PathEstCnn
+from model.PathEstNetModel import PathEstDnnLoss
+from model.PathEstNetModel import PathEstCnnLoss
+from model.PathEstNetModel import PathEstDnnTee
+from model.PathEstNetModel import PathEstCnnTee
+from model.PathEstNetModel import PathEstBaseModel

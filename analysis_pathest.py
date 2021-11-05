@@ -2,16 +2,47 @@ import numpy as np
 import scipy.stats
 
 from loader import CsiDataloader, DataType
-from model import DnnPathEst
+from model import PathEstDnn, PathEstCnn
 from train import load_model_from_file
 from utils import DenoisingMethodLS
-from utils import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod, DnnModelPathestMethod
+from utils import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod, ModelPathestMethod
 from utils import draw_line
 from utils.DftChuckTestMethod import TestMethod
 import utils.config as config
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
+
+# test var-test diff method
+cmp_var_diff_method = lambda n_r, cp, n_sc: [
+    VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
+    # VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
+    VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+
+# test sw-test diff method
+cmp_sw_diff_method = lambda n_r, cp, n_sc: [
+    SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
+    # SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
+    SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+
+# test ks-test diff method
+cmp_ks_diff_method = lambda n_r, cp, n_sc: [
+    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=True),
+    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=False),
+    # KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
+    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+
+# test ad-test diff method
+cmp_ad_diff_method = lambda n_r, cp, n_sc: [
+    ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
+    # ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
+    ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+
+# test normal-test diff method
+cmp_normal_diff_method = lambda n_r, cp, n_sc: [
+    NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
+    # NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
+    NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
 
 
 def flatten_complex(a):
@@ -136,60 +167,13 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None,
     hx = h @ xp
     cp = 20
     g_len = h.shape[0] * h.shape[-1]
-    model = DnnPathEst(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+    model = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
                        dnn_list=[256, 256, 128, 128, 64, 32],
                        extra='')
     model = load_model_from_file(model, use_gpu)
-    # dft_chuck_test_list = [VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc),
-    #                        SWTestMethod(csi_loader.n_r, 20),
-    #                        KSTestMethod(csi_loader.n_r, 20),
-    #                        ADTestMethod(csi_loader.n_r, 20, significance_level=4),
-    #                        NormalTestMethod(csi_loader.n_r, 20)]
-
-    # test var-test diff method
-    # dft_chuck_test_list = [
-    #     VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row),
-    #     VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.whole_noise),
-    #     VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.dft_diff)]
-
-    # test sw-test diff method
-    # dft_chuck_test_list = [
-    #     SWTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row),
-    #     SWTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.whole_noise),
-    #     SWTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.dft_diff)]
-
-    # test ks-test diff method
-    # dft_chuck_test_list = [
-    #     KSTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row, two_samp=True),
-    #     KSTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row, two_samp=False),
-    #     KSTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.whole_noise),
-    #     KSTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.dft_diff)]
-
-    # test ad-test diff method
-    # dft_chuck_test_list = [
-    #     ADTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row),
-    #     ADTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.whole_noise),
-    #     ADTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.dft_diff)]
-
-    # test normal-test diff method
-    # dft_chuck_test_list = [
-    #     NormalTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.one_row),
-    #     NormalTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.whole_noise),
-    #     NormalTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, testMethod=TestMethod.dft_diff)]
-
-    # test ad-test diff significance level
-    # dft_chuck_test_list = [VarTestMethod(csi_loader.n_r, 20),
-    #                        ADTestMethod(csi_loader.n_r, 20, significance_level=4, full_name=True),
-    #                        ADTestMethod(csi_loader.n_r, 20, significance_level=1, full_name=True),
-    #                        ]
-
-    # test model
-    # dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model,
-    #                                              testMethod=TestMethod.one_row)]
 
     # cmp model and test
-    dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model,
-                                                 testMethod=TestMethod.one_row),
+    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model),
                            VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
                                          testMethod=TestMethod.one_row)]
 
@@ -277,16 +261,31 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
     cp = 20
     h_len = h.shape[0] * csi_loader.n_sc
 
-    model = DnnPathEst(csiDataloader=csi_loader, add_var=True, use_true_var=False,
-                       dnn_list=[256, 256, 128, 128, 64, 32],
-                       extra='')
-    model = load_model_from_file(model, use_gpu)
+    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+                           dnn_list=[256, 256, 128, 128, 64, 32],
+                           extra='')
+    model_dnn = load_model_from_file(model_dnn, use_gpu)
+    model_dnn.name = 'dnn'
 
-    model.name = 'dnn'
-    dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model,
-                                                 testMethod=TestMethod.one_row),
+    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
+                           dnn_list=[2000, 200, 20], extra='')
+    model_cnn = load_model_from_file(model_cnn, use_gpu)
+    model_dnn.name = 'cnn'
+
+    # test dnn
+    # dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_dnn,),
+    #                        VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
+    #                                      testMethod=TestMethod.one_row)]
+    # test cnn
+    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_cnn, ),
                            VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
                                          testMethod=TestMethod.one_row)]
+    # dft_chuck_test_list = cmp_var_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+    # dft_chuck_test_list = cmp_sw_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+    dft_chuck_test_list = cmp_ks_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+    # dft_chuck_test_list = cmp_ad_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+    # dft_chuck_test_list = cmp_normal_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+
     snr_h_mse = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_h_ls_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
     snr_h_dft_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
@@ -304,7 +303,6 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
             true_var = var[j, 0, 0].item() / 2
             for m in range(g.shape[1]):
                 i_g_hat = g_hat[j][m]
-                i_g = g[j][m]
                 i_g_hat_idft = g_hat_idft[j][m]
                 path_g_dict = {}
 
@@ -351,12 +349,12 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
     draw_h_nmse_dict['dft_chuck'] = 10 * np.log10(np.array(snr_h_dft_mse) / h_len)
 
     draw_line(list(range(snr_start, snr_end, snr_step)), draw_h_nmse_dict,
-              '{}-path-est-h-nmse-cmp'.format(csi_loader), diff_line_markers=True, )
+              '{}-path-est-h-nmse-cmp'.format(csi_loader), diff_line_markers=True, save_dir=config.PATHEST_RESULT_IMG)
 
 
 if __name__ == '__main__':
     # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)
-    cmp_diff_test_method_nmse(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=15, snr_step=2)
+    cmp_diff_test_method_nmse(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=25, snr_step=2)
     # cmp_diff_test_method(data_path='data/spatial_mu_ULA_64_32_64_100_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
     #                      fix_path=10)

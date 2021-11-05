@@ -1,3 +1,5 @@
+from enum import Enum
+
 import torch
 
 
@@ -84,6 +86,12 @@ def print_parameter_number(net):
     total_num = sum(p.numel() for p in net.parameters())
     trainable_num = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print({'Total': total_num, 'Trainable': trainable_num})
+
+
+class TestMethod(Enum):
+    one_row = 1
+    whole_noise = 2
+    dft_diff = 3
 
 
 if __name__ == '__main__':
