@@ -9,7 +9,7 @@ from utils.model import *
 
 class PathEstBaseModel(BaseNetModel):
 
-    def __init__(self, csiDataloader: CsiDataloader, test_method:TestMethod):
+    def __init__(self, csiDataloader: CsiDataloader, test_method: TestMethod):
         super().__init__(csiDataloader)
         self.test_method = test_method
 
@@ -120,6 +120,8 @@ class PathEstCnn(PathEstBaseModel):
             self.fc.append(nn.Linear(i, j))
             self.fc.append(nn.Sigmoid())
         self.fc = nn.Sequential(*self.fc)
+
+        self.name = self.__str__()
 
     def __str__(self):
         name = '{}-{}_r{}t{}K{}_c{}ke{}dn{}-var{}_tvar{}{}'.format(self.get_dataset_name(), self.__class__.__name__,

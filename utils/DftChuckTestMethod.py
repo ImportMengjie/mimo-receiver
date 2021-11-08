@@ -8,6 +8,10 @@ import torch
 from model import PathEstBaseModel
 from utils import TestMethod
 
+import config
+
+use_gpu = config.USE_GPU and True
+
 
 class DftChuckTestMethod(abc.ABC):
 
@@ -65,7 +69,8 @@ class DftChuckTestMethod(abc.ABC):
                 idft_g_chuck = g_hat_idft * chuck_array
                 g_chuck = np.fft.fft(idft_g_chuck, axis=0)
                 dft_diff = g_hat - g_chuck
-                dft_diff = np.concatenate((dft_diff.real, dft_diff.imag), axis=1)
+                dft_diff = np.concatenate(
+                    [dft_diff.real.reshape(dft_diff.shape + (1,)), dft_diff.imag.reshape(dft_diff.shape + (1,))], -1)
                 is_path, probability = self.test_dft_diff(dft_diff, est_var, true_var, i, g_chuck)
                 probability_list.append(probability)
                 if is_path:
@@ -97,7 +102,14 @@ class ModelPathestMethod(DftChuckTestMethod):
     def test_one_row(self, idft_row: np.ndarray, est_var, true_var, i, idft_g) -> (bool, any):
         idft_g = torch.from_numpy(idft_g.reshape((1,) + idft_g.shape))
         idft_row = torch.from_numpy(idft_row.reshape((1,) + idft_row.shape))
-        p, = self.model(idft_g, 0, idft_row, torch.tensor(true_var), torch.tensor(est_var))
+        true_var = torch.tensor(true_var)
+        est_var = torch.tensor(est_var)
+        if use_gpu:
+            idft_g = idft_g.cuda()
+            idft_row = idft_row.cuda()
+            true_var = true_var.cuda()
+            est_var = est_var.cuda()
+        p, = self.model(idft_g, 0, idft_row, true_var, est_var)
         return p >= 0.5, p
 
     def test_whole_noise(self, idft_rows: np.ndarray, est_var, true_var, i, idft_g) -> (bool, any):
@@ -105,7 +117,13 @@ class ModelPathestMethod(DftChuckTestMethod):
 
     def test_dft_diff(self, dft_diff: np.ndarray, est_var, true_var, i, dft_chuck_g) -> (bool, any):
         dft_diff = torch.from_numpy(dft_diff.reshape((1,) + dft_diff.shape))
-        p, = self.model(dft_diff, 0, torch.tensor(true_var), torch.tensor(est_var))
+        true_var = torch.tensor(true_var)
+        est_var = torch.tensor(est_var)
+        if use_gpu:
+            dft_diff = dft_diff.cuda()
+            true_var = true_var.cuda()
+            est_var = est_var.cuda()
+        p, = self.model(dft_diff, 0, true_var, est_var)
         return p >= 0.5, p
 
     def name(self):

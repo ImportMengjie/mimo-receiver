@@ -167,13 +167,25 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None,
     hx = h @ xp
     cp = 20
     g_len = h.shape[0] * h.shape[-1]
-    model = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
-                       dnn_list=[256, 256, 128, 128, 64, 32],
-                       extra='')
-    model = load_model_from_file(model, use_gpu)
 
-    # cmp model and test
-    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model),
+    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+                           dnn_list=[256, 256, 128, 128, 64, 32],
+                           extra='')
+    model_dnn = load_model_from_file(model_dnn, use_gpu)
+    model_dnn.name = 'dnn'
+
+    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
+                           dnn_list=[2000, 200, 20], extra='')
+    model_cnn = load_model_from_file(model_cnn, use_gpu)
+    model_cnn.name = 'cnn'
+
+    # cmp dnn model and test
+    # dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_dnn),
+    #                        VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
+    #                                      testMethod=TestMethod.one_row)]
+
+    # cmp cnn model and test
+    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_cnn),
                            VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
                                          testMethod=TestMethod.one_row)]
 
@@ -270,7 +282,7 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
     model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
                            dnn_list=[2000, 200, 20], extra='')
     model_cnn = load_model_from_file(model_cnn, use_gpu)
-    model_dnn.name = 'cnn'
+    model_cnn.name = 'cnn'
 
     # test dnn
     # dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_dnn,),
@@ -282,7 +294,7 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
                                          testMethod=TestMethod.one_row)]
     # dft_chuck_test_list = cmp_var_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
     # dft_chuck_test_list = cmp_sw_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
-    dft_chuck_test_list = cmp_ks_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
+    # dft_chuck_test_list = cmp_ks_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
     # dft_chuck_test_list = cmp_ad_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
     # dft_chuck_test_list = cmp_normal_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
 
