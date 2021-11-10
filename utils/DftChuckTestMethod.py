@@ -8,14 +8,14 @@ import torch
 from model import PathEstBaseModel
 from utils import TestMethod
 
-import config
+import utils.config as config
 
 use_gpu = config.USE_GPU and True
 
 
 class DftChuckTestMethod(abc.ABC):
 
-    def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
+    def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
                  full_name=False, min_path=0):
         self.testMethod = testMethod
         self.n_r = n_r
@@ -156,7 +156,7 @@ class VarTestMethod(DftChuckTestMethod):
         p = 1 - scipy.stats.chi2(len(dft_diff) - 1).cdf(cur_row_chi)
         return p <= self.a, p
 
-    def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
+    def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
                  full_name=False):
         super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
 
@@ -178,7 +178,7 @@ class SWTestMethod(DftChuckTestMethod):
         w, p = scipy.stats.shapiro(dft_diff.flatten())
         return p <= self.a, p
 
-    def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
+    def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
                  full_name=False):
         super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
 
@@ -206,7 +206,7 @@ class KSTestMethod(DftChuckTestMethod):
         _, p = scipy.stats.kstest(dft_diff.flatten(), 'norm', (0, var ** 0.5))
         return p <= self.a, p
 
-    def __init__(self, n_r, n_sc, cp, two_samp=True, a=0.05, use_true_var=False,
+    def __init__(self, n_r, n_sc, cp, two_samp=True, a=0.1, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row,
                  full_name=False):
         super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
@@ -214,8 +214,8 @@ class KSTestMethod(DftChuckTestMethod):
 
     def name(self):
         n = 'ks-test-{}'.format(self.testMethod.name)
-        if self.testMethod == TestMethod.one_row:
-            n += '-ts{}'.format(self.two_samp)
+        # if self.testMethod == TestMethod.one_row:
+        #     n += '-ts{}'.format(self.two_samp)
         return n
 
 
@@ -234,7 +234,7 @@ class ADTestMethod(DftChuckTestMethod):
         statistic, critical_values, significance_level = scipy.stats.anderson(dft_diff.flatten(), 'norm')
         return statistic > list(critical_values)[self.significance_level], statistic
 
-    def __init__(self, n_r, n_sc, cp, significance_level=4, a=0.05, use_true_var=False,
+    def __init__(self, n_r, n_sc, cp, significance_level=4, a=0.1, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row,
                  full_name=False):
         super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
@@ -258,7 +258,7 @@ class NormalTestMethod(DftChuckTestMethod):
         _, p = scipy.stats.normaltest(dft_diff.flatten())
         return p <= self.a, p
 
-    def __init__(self, n_r, n_sc, cp, a=0.05, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
+    def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
                  full_name=False):
         super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
 

@@ -27,7 +27,7 @@ cmp_sw_diff_method = lambda n_r, cp, n_sc: [
 
 # test ks-test diff method
 cmp_ks_diff_method = lambda n_r, cp, n_sc: [
-    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=True),
+    # KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=True),
     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=False),
     # KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
@@ -160,35 +160,12 @@ def analysis_dft_denosing(data_path, fix_snr, max_count, path_start, path_end=No
               diff_line_markers=True)
 
 
-def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None, draw_nmse=True):
-    csi_loader = CsiDataloader(data_path, train_data_radio=1)
+def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, snr_step, fix_path=None, draw_nmse=True):
     xp = csi_loader.get_pilot_x()
     h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
     hx = h @ xp
     cp = 20
     g_len = h.shape[0] * h.shape[-1]
-
-    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
-                           dnn_list=[256, 256, 128, 128, 64, 32],
-                           extra='')
-    model_dnn = load_model_from_file(model_dnn, use_gpu)
-    model_dnn.name = 'dnn'
-
-    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
-                           dnn_list=[2000, 200, 20], extra='')
-    model_cnn = load_model_from_file(model_cnn, use_gpu)
-    model_cnn.name = 'cnn'
-
-    # cmp dnn model and test
-    # dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_dnn),
-    #                        VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
-    #                                      testMethod=TestMethod.one_row)]
-
-    # cmp cnn model and test
-    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_cnn),
-                           VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
-                                         testMethod=TestMethod.one_row)]
-
     snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_total_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
@@ -255,48 +232,23 @@ def cmp_diff_test_method(data_path, snr_start, snr_end, snr_step, fix_path=None,
             draw_nmse_dict[dft_chuck_test_list[dft_idx].name()] = 10 * np.log10(mse_sum / g_len)
 
     draw_line(list(range(snr_start, snr_end, snr_step)), draw_right_dict, '{}-path-est-cmp'.format(csi_loader),
-              diff_line_markers=True, ylabel='%')
+              diff_line_markers=True, ylabel='%', save_dir=config.PATHEST_RESULT_IMG)
     draw_line(list(range(snr_start, snr_end, snr_step)), draw_over_error_dict,
-              '{}-over-path-est-cmp'.format(csi_loader), diff_line_markers=True, ylabel='%')
+              '{}-over-path-est-cmp'.format(csi_loader), diff_line_markers=True, ylabel='%',
+              save_dir=config.PATHEST_RESULT_IMG)
     if draw_nmse:
         draw_nmse_dict['ls'] = 10 * np.log10(np.array(ls_mse) / g_len)
         draw_nmse_dict['dft_chuck'] = 10 * np.log10(np.array(dft_chuck_mse) / g_len)
         draw_line(list(range(snr_start, snr_end, snr_step)), draw_nmse_dict,
-                  '{}-path-est-nmse-cmp'.format(csi_loader), diff_line_markers=True, )
+                  '{}-path-est-nmse-cmp'.format(csi_loader), diff_line_markers=True, save_dir=config.PATHEST_RESULT_IMG)
 
 
-def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=None, ):
+def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_end, snr_step, fix_path=None, ):
     csi_loader = CsiDataloader(data_path, train_data_radio=1)
     xp = csi_loader.get_pilot_x()
-    h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
+    h = csi_loader.get_h(DataType.train)[:2000 // csi_loader.n_t]
     hx = h @ xp
-    cp = 20
     h_len = h.shape[0] * csi_loader.n_sc
-
-    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
-                           dnn_list=[256, 256, 128, 128, 64, 32],
-                           extra='')
-    model_dnn = load_model_from_file(model_dnn, use_gpu)
-    model_dnn.name = 'dnn'
-
-    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
-                           dnn_list=[2000, 200, 20], extra='')
-    model_cnn = load_model_from_file(model_cnn, use_gpu)
-    model_cnn.name = 'cnn'
-
-    # test dnn
-    # dft_chuck_test_list = [DnnModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_dnn,),
-    #                        VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
-    #                                      testMethod=TestMethod.one_row)]
-    # test cnn
-    dft_chuck_test_list = [ModelPathestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc, model=model_cnn, ),
-                           VarTestMethod(n_r=csi_loader.n_r, cp=cp, n_sc=csi_loader.n_sc,
-                                         testMethod=TestMethod.one_row)]
-    # dft_chuck_test_list = cmp_var_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
-    # dft_chuck_test_list = cmp_sw_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
-    # dft_chuck_test_list = cmp_ks_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
-    # dft_chuck_test_list = cmp_ad_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
-    # dft_chuck_test_list = cmp_normal_diff_method(csi_loader.n_r, cp, csi_loader.n_sc)
 
     snr_h_mse = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_h_ls_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
@@ -365,8 +317,56 @@ def cmp_diff_test_method_nmse(data_path, snr_start, snr_end, snr_step, fix_path=
 
 
 if __name__ == '__main__':
-    # analysis_dft_denosing(data_path="data/spatial_mu_ULA_32_16_64_10_l10_11.mat", fix_snr=2, max_count=3, path_start=1,
-    #                       path_end=20)
-    cmp_diff_test_method_nmse(data_path='data/imt_2020_64_32_64_400.mat', snr_start=0, snr_end=25, snr_step=2)
-    # cmp_diff_test_method(data_path='data/spatial_mu_ULA_64_32_64_100_l10_11.mat', snr_start=0, snr_end=15, snr_step=1,
+    import logging
+
+    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
+
+    cp = 20
+    data_path = 'data/imt_2020_64_32_64_400.mat'
+    csi_loader = CsiDataloader(data_path, train_data_radio=1)
+    n_r = csi_loader.n_r
+    n_sc = csi_loader.n_sc
+
+    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+                           dnn_list=[256, 256, 128, 128, 64, 32],
+                           extra='')
+    model_dnn = load_model_from_file(model_dnn, use_gpu)
+    model_dnn.name = 'dnn'
+
+    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
+                           dnn_list=[2000, 200, 20], extra='')
+    model_cnn = load_model_from_file(model_cnn, use_gpu)
+    model_cnn.name = 'cnn'
+
+    dft_chuck_test_list = []
+    # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
+    # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_cnn))
+
+    # var-test
+    dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+
+    # ks-test
+    dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+
+    # ad-test
+    # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+
+    # sw-test
+    # dft_chuck_test_list.append(SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+
+    # norm-test
+    # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+
+    cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=25,
+                              snr_step=2)
+    # cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=15,
+    #                      snr_step=1,
     #                      fix_path=10)
+
+    # analysis_dft_denosing(data_path=data_path, fix_snr=2, max_count=3, path_start=1,
+    #                       path_end=20)
