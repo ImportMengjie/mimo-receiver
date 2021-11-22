@@ -2,6 +2,7 @@ from typing import List
 
 import matplotlib.pyplot as plt
 import os
+import json
 
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -39,9 +40,22 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, show
     plt.ylabel(ylabel)
     plt.legend()
     if save_dir:
-        save_name = (title if title else '') + '-'.join(y_dict.keys()) + '.png'
+        save_name = (title if title else '') + '-'.join(y_dict.keys())
         save_name = save_name.replace('/', '|')
-        save_path = os.path.join(save_dir, save_name)
+        save_name_img = save_name + '.png'
+        save_name_json = save_name + '.json'
+        data_json = {
+            'title': title,
+            'x': x,
+            'y_dict': y_dict,
+            'xlabel': xlabel,
+            'ylable': ylabel,
+            'style': diff_line_style,
+            'markers': diff_line_markers
+        }
+        with open(save_name_json) as f:
+            json.dump(data_json, f, indent=2)
+        save_path = os.path.join(save_dir, save_name_img)
         plt.savefig(save_path, format='png')
     if show:
         plt.show()
