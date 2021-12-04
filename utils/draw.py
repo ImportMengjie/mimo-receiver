@@ -23,7 +23,7 @@ line_style_list = ['-', '--', '-.', ':'][::-1]
 markers = ['^', 'v', '+', '*', 'o', 's', 'x', 'p', '1', '2']
 
 
-def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, show=True, xlabel='snr(db)',
+def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save_path=None,show=True, xlabel='snr(db)',
               ylabel='nmse(db)', diff_line_style=True, diff_line_markers=False):
     if filter_func is None:
         filter_func = lambda n: True
@@ -39,23 +39,28 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, show
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.legend()
+    save_name = (title if title else '') + '-'.join(y_dict.keys())
+    save_name = save_name.replace('/', '|')
+    save_name_img = save_name + '.png'
+    save_name_json = save_name + '.json'
     if save_dir:
-        save_name = (title if title else '') + '-'.join(y_dict.keys())
-        save_name = save_name.replace('/', '|')
-        save_name_img = save_name + '.png'
-        save_name_json = save_name + '.json'
+        for k in y_dict.keys():
+            if not isinstance(y_dict[k], list):
+                y_dict[k] = y_dict[k].tolist()
         data_json = {
             'title': title,
             'x': x,
             'y_dict': y_dict,
             'xlabel': xlabel,
-            'ylable': ylabel,
+            'ylabel': ylabel,
             'style': diff_line_style,
             'markers': diff_line_markers
         }
-        with open(save_name_json) as f:
+        with open(os.path.join(save_dir, save_name_json), 'w') as f:
             json.dump(data_json, f, indent=2)
+    if save_path is None and save_dir is not None:
         save_path = os.path.join(save_dir, save_name_img)
+    if save_path or save_dir:
         plt.savefig(save_path, format='png')
     if show:
         plt.show()

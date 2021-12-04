@@ -8,16 +8,18 @@ clear ;
 
 N_r = 64
 N_t = 32
-N_sc = 64
-J = 400
-sce = 'RMa_A'
+N_sc = 256
+J = 5
+sce = 'UMi_A'
 
-sc_band = 2e4;
+sc_band = 15e3;
 bw = sc_band*N_sc
 fc = 5
 
 path = sprintf('%s',fileparts(mfilename('fullpath')));
 cd(path)
+
+
 
 %% Channel coefficient generation for 1 UT-BS link with default settings. 
 %Create folder to store data
@@ -42,12 +44,14 @@ Input=struct('Sce',sce,... %Set the scenario (InH_x, UMi_x, UMa_x, RMa_x)
     'fc',fc,...          %Set the center frequency (GHz)
     'AA',[1,1,N_r,1,1,2.5,2.5,0.5,0.5,102],... %AA=(Mg,Ng,M,N,P,dgH,dgV,dH,dV,downtilt)  BS antenna panel configuration,unit of d and dg is wave length.
     'sim',1,...         %Set the number of simulations
-    'BW',bw,...        %Set the bandwidth of the simulation(MHz)
-     'T',J*2);            %Set the number of sampling points of CIR in time domain
+    'BW',bw/1e6,...        %Set the bandwidth of the simulation(MHz)
+     'T',J);            %Set the number of sampling points of CIR in time domain
+ 
+save ./ScenarioParameters/base.mat sc_band bw fc N_sc;
 
 layoutpar=Layout(Input.Sce,Input.C,Input.N_user,Input.fc,Input.AA);
 [Pathloss,SF_sigma]=GeneratePathloss(layoutpar);%Generate path loss and shadow fading.
-fixpar=Scenario(Input.fc,layoutpar);%Generate scenario information. 
+fixpar=Scenario(Input.fc,layoutpar);%Generate scenario information.
 sigmas= GenerateLSP(layoutpar,fixpar);
 GenerateSSP(layoutpar,fixpar,Input.sim,sigmas);%Generate small-scale parameters.
 GenerateCIR(fixpar,layoutpar,Input.sim,Input.BW,Input.T);%Generate the channel coefficient.

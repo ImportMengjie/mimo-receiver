@@ -27,7 +27,7 @@ def redraw(json_path: str):
         data_json = json.load(f)
     path, _ = os.path.splitext(json_path)
     img_path = path + '.png'
-    draw_line(x=data_json['x'], y_dict=data_json['y_dict'], title=data_json['title'], save_dir=img_path,
+    draw_line(x=data_json['x'], y_dict=data_json['y_dict'], title=data_json['title'], save_path=img_path,
               xlabel=data_json['xlabel'], ylabel=data_json['ylabel'])
 
 
