@@ -4,12 +4,11 @@ import random
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-from utils import DenoisingMethod
 from utils import complex2real
 from utils import get_interpolation_pilot_idx
 from utils import line_interpolation_hp_pilot
 from utils import to_cuda
-import utils.config as config
+import config.config as config
 
 
 class InterpolationNetDataset(BaseDataset):

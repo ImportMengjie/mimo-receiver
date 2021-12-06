@@ -8,9 +8,10 @@ clear ;
 
 N_r = 64
 N_t = 32
-N_sc = 256
-J = 5
-sce = 'UMi_A'
+N_sc = 1024
+J = 200
+sim = 1
+sce = 'UMa_A'
 
 sc_band = 15e3;
 bw = sc_band*N_sc
@@ -43,7 +44,7 @@ Input=struct('Sce',sce,... %Set the scenario (InH_x, UMi_x, UMa_x, RMa_x)
     'N_user',N_t,...    %Set the number of subscribers per Bs
     'fc',fc,...          %Set the center frequency (GHz)
     'AA',[1,1,N_r,1,1,2.5,2.5,0.5,0.5,102],... %AA=(Mg,Ng,M,N,P,dgH,dgV,dH,dV,downtilt)  BS antenna panel configuration,unit of d and dg is wave length.
-    'sim',1,...         %Set the number of simulations
+    'sim',sim,...         %Set the number of simulations
     'BW',bw/1e6,...        %Set the bandwidth of the simulation(MHz)
      'T',J);            %Set the number of sampling points of CIR in time domain
  

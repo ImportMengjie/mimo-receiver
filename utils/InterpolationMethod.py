@@ -8,7 +8,7 @@ from utils import complex2real, DenoisingMethodLS
 from utils import line_interpolation_hp_pilot
 from utils import get_interpolation_pilot_idx
 from utils import DenoisingMethod
-from utils import config
+from config import config
 
 
 class InterpolationMethod(abc.ABC):
@@ -97,12 +97,11 @@ class InterpolationMethodLine(InterpolationMethod):
 
 class InterpolationMethodChuck(InterpolationMethodLine):
 
-    def __init__(self, n_sc, pilot_count: int, path_count: int, denoisingMethod: DenoisingMethod = None,
+    def __init__(self, n_sc, pilot_count: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
                  padding_chuck=False, extra=''):
         super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
-        self.chuck_array = np.concatenate((np.ones(path_count), np.zeros(n_sc - path_count)))
-        self.chuck_array = self.chuck_array.reshape((-1, 1))
         self.padding_chuck = padding_chuck
+        self.path_chuck_array = path_chuck_array
 
     def get_key_name(self):
         if self.is_denosing:
@@ -136,9 +135,9 @@ class InterpolationMethodChuck(InterpolationMethodLine):
             H_hat = h_p
             H_hat = H_hat.permute(0, 3, 1, 2)
             H_hat = H_hat.numpy()
-            H_hat_in_time = np.fft.ifft2(H_hat)
-            H_hat_in_time = H_hat_in_time * self.chuck_array
-            H_hat = np.fft.fft2(H_hat_in_time)
+            H_hat_in_time = np.fft.ifft(H_hat, axis=-2)
+            H_hat_in_time = H_hat_in_time * self.path_chuck_array
+            H_hat = np.fft.fft(H_hat_in_time, axis=-2)
         else:
             h_p = h_p.permute(0, 3, 1, 2)
             h_p = h_p.numpy()
@@ -150,7 +149,7 @@ class InterpolationMethodChuck(InterpolationMethodLine):
                                           np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
                                           h_p_in_time[:, :, split_idx:]), axis=-2)
             if self.padding_chuck:
-                H_p_in_time = H_p_in_time * self.chuck_array
+                H_p_in_time = H_p_in_time * self.path_chuck_array
             H_hat = np.fft.fft(H_p_in_time, axis=-2)
 
             # H_hat_in_time = np.fft.ifft2(H_hat)

@@ -6,8 +6,6 @@ from utils.common import get_interpolation_pilot_idx
 from utils.common import to_cuda, print_parameter_number
 from utils.common import TestMethod
 
-import utils.config
-
 from utils.draw import draw_line, draw_point_and_line
 
 from utils.DetectionMethod import DetectionMethod

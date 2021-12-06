@@ -124,10 +124,30 @@ class CsiDataloader:
         self.rhh = (data.transpose(-1, -2).conj() @ data).mean(0).mean(0)
         self.train_H = data[:self.train_count]
         self.test_H = data[self.train_count:]
+
         logging.info(
             'loaded J={},n_c={},n_r={},n_t={},n_sc={},train={},test={}'.format(self.J, self.n_c, self.n_r, self.n_t,
                                                                                self.n_sc, self.train_H.shape[0],
                                                                                self.test_H.shape[0]))
+
+    def _get_path_count(self, j: int, m: int):
+        return int(self.path_count[j * self.n_t + m].item()) + 32
+
+    def get_path_count(self, dataType: DataType, j, m):
+        if dataType == DataType.train:
+            return self._get_path_count(j, m)
+        else:
+            return self._get_path_count(j + self.train_count, m)
+
+    def gen_chuck_array(self, path_count):
+        return np.concatenate((np.ones(path_count), np.zeros(self.n_sc - path_count)))
+
+    def get_chuck_array(self, dataType: DataType):
+        chuck_array = np.zeros((self.get_h(dataType).shape[0], self.n_t, self.n_sc, self.n_r))
+        for j in range(0, chuck_array.shape[0]):
+            for m in range(0, self.n_t):
+                chuck_array[j, m] = self.gen_chuck_array(self.get_path_count(dataType, j, m)).reshape((-1, 1))
+        return chuck_array
 
     @USE_GPU
     def noise_snr_range(self, hx: torch.Tensor, snr_range: list, one_col=False):
@@ -220,5 +240,5 @@ class CsiDataloader:
 
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
-    cd = CsiDataloader('../data/h_16_16_64_5.mat')
+    cd = CsiDataloader('../data/spatial_mu_ULA_64_32_64_10_l5_11.mat')
     # cd = CsiDataloader('../data/h_16_16_64_1.mat')

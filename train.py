@@ -11,21 +11,13 @@ from torch.utils.data import DataLoader
 from loader import CsiDataloader, BaseDataset
 from loader import DataType
 from loader import DenoisingNetDataset
-from loader import DetectionNetDataset
-from loader import InterpolationNetDataset
 from model import BaseNetModel
 from model import DenoisingNetLoss
 from model import CBDNetBaseModel
 from model import DenoisingNetTee
-from model import DetectionNetLoss
-from model import DetectionNetModel
-from model import DetectionNetTee
-from model import InterpolationNetLoss
-from model import CBDNetSFModel
-from model import InterpolationNetTee
 from model import Tee
 from utils import AvgLoss, print_parameter_number
-import utils.config as config
+import config.config as config
 
 
 # from torchsummary import summary

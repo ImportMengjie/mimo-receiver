@@ -1,7 +1,6 @@
 import os
 import json
 from typing import List
-import torch
 
 from loader import CsiDataloader, DataType, DetectionNetDataset
 from model import DetectionNetModel, DetectionNetLoss, DetectionNetTee
@@ -13,7 +12,7 @@ from utils import DetectionMethodModel
 from utils import DetectionMethodConjugateGradient
 from utils import draw_line
 
-import utils.config as config
+import config.config as config
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu

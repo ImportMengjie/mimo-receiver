@@ -1,3 +1,4 @@
+import logging
 import os.path
 
 import numpy as np
@@ -17,9 +18,9 @@ def get_freq_G(N_sc, H: np.ndarray, fs, delay, path_count):
     N_r = H.shape[0]
     path = H.shape[2]
     j = H.shape[-1]
-    path_count.extend([path] * H.shape[3])
     G_m_s = np.zeros((N_sc, N_r, j), dtype=np.complex_)
-    l_v = (delay * fs).swapaxes(0, 1)
+    l_v = (delay * fs)
+    path_count.extend(np.ceil(l_v[-1]))
     # l_v = np.rint(l_v)
     H = H.squeeze(1)
     for k in range(0, N_sc):
@@ -44,12 +45,13 @@ def imt_2020_generate(step=2):
     pathloss = pathloss.get('Pathloss').squeeze()
     sc_band = base_conf.get('sc_band').item()
     while os.path.exists('H/H_sim{}_data.mat'.format(sim)):
+        logging.info('start H/H_sim{}_data.mat'.format(sim))
         h_data = scio.loadmat('H/H_sim{}_data.mat'.format(sim))
         ssp_data = scio.loadmat('SSP/Sim_{}_data.mat'.format(sim))
 
-        los_delay = ssp_data.get('LOS')['Delay'][0, 0]
-        nlos_delay = ssp_data.get('NLOS')['Delay'][0, 0]
-        o2i_delay = ssp_data.get('O2I')['Delay'][0, 0]
+        los_delay = ssp_data.get('LOS')['Delay'][0, 0].swapaxes(0, 1)
+        nlos_delay = ssp_data.get('NLOS')['Delay'][0, 0].swapaxes(0, 1)
+        o2i_delay = ssp_data.get('O2I')['Delay'][0, 0].swapaxes(0, 1)
 
         h_los = un_squeeze(h_data.get('H_u_s_n_LOS'))
         h_nlos = un_squeeze(h_data.get('H_u_s_n_NLOS'))
@@ -73,9 +75,9 @@ def imt_2020_generate(step=2):
         los_pathloss = np.sqrt(np.power(10, -los_pathloss / 10))
         nlos_pathloss = np.sqrt(np.power(10, -nlos_pathloss / 10))
         o2i_pathloss = np.sqrt(np.power(10, -o2i_pathloss / 10))
-        h_los = los_pathloss * h_los
-        h_nlos = nlos_pathloss * h_nlos
-        h_o2i = o2i_pathloss * h_o2i
+        # h_los = los_pathloss * h_los
+        # h_nlos = nlos_pathloss * h_nlos
+        # h_o2i = o2i_pathloss * h_o2i
 
         J = h_los.shape[3]
         N_r = h_los.shape[0]
@@ -98,6 +100,7 @@ def imt_2020_generate(step=2):
 
 if __name__ == '__main__':
     import sys
+    logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
     H, path_count, J, N_r, N_t, N_sc = imt_2020_generate(2)
     if H is not None:
@@ -108,3 +111,4 @@ if __name__ == '__main__':
         f.create_dataset('H', data=H.transpose())
         f.create_dataset('path_count', data=path_count)
         f.close()
+        logging.info('save {}'.format(filename))

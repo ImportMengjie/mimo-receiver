@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 
-from utils import config
+from config import config
 
 
 class Padding(nn.Module):

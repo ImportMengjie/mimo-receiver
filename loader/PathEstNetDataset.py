@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-import utils.config as config
+import config.config as config
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType

@@ -4,7 +4,7 @@ from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
 
-import utils.config as config
+import config.config as config
 from utils import to_cuda
 
 

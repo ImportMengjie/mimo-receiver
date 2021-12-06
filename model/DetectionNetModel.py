@@ -3,13 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
 
-import math
-
 from loader import CsiDataloader
 from model import Tee
 from model import BaseNetModel
 
-import utils.config as config
+import config.config as config
 
 
 class Lcg(nn.Module):

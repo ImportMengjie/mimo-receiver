@@ -6,7 +6,7 @@ from loader import CsiDataloader
 from loader import DataType
 from utils import complex2real
 from utils import to_cuda
-import utils.config as config
+import config.config as config
 
 
 class DenoisingNetDataset(BaseDataset):

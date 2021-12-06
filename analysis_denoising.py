@@ -1,20 +1,18 @@
-import os
 from typing import List
 
 import numpy as np
-import torch
 
 from loader import CsiDataloader, DataType
 from model import DenoisingNetBaseModel, CBDNetBaseModel
-from train import Train, load_model_from_file
-from utils import DenoisingMethod, draw_line, conj_t, complex2real, draw_point_and_line
+from train import load_model_from_file
+from utils import DenoisingMethod, draw_line, complex2real, draw_point_and_line
 from utils import DenoisingMethodLS
 from utils import DenoisingMethodMMSE
 from utils import DenoisingMethodIdealMMSE
 from utils import DenoisingMethodModel
-from utils.config import *
+from config.config import *
 
-import utils.config as config
+import config.config as config
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu

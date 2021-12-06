@@ -8,7 +8,7 @@ import torch
 from model import PathEstBaseModel
 from utils import TestMethod
 
-import utils.config as config
+import config.config as config
 
 use_gpu = config.USE_GPU and True
 

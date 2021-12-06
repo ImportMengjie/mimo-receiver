@@ -1,7 +1,7 @@
 import json
 import os
 
-from utils import config
+from config import config
 from utils import draw_line
 
 

@@ -8,7 +8,7 @@ from utils import DenoisingMethodLS
 from utils import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod, ModelPathestMethod
 from utils import draw_line
 from utils.DftChuckTestMethod import TestMethod
-import utils.config as config
+import config.config as config
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -162,9 +162,8 @@ def analysis_dft_denosing(data_path, fix_snr, max_count, path_start, path_end=No
 
 def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, snr_step, fix_path=None, draw_nmse=True):
     xp = csi_loader.get_pilot_x()
-    h = csi_loader.get_h(DataType.train)[:1000 // csi_loader.n_t]
+    h = csi_loader.get_h(DataType.test)
     hx = h @ xp
-    cp = 20
     g_len = h.shape[0] * h.shape[-1]
     snr_right_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_error_est_count = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
@@ -176,6 +175,7 @@ def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, sn
 
     get_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
     for snr in range(snr_start, snr_end, snr_step):
+        logging.info('start snr {}'.format(snr))
         n, var = csi_loader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
         y = hx + n
         h_hat = DenoisingMethodLS().get_h_hat(y, h, xp, var, csi_loader.rhh)
@@ -244,9 +244,8 @@ def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, sn
 
 
 def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_end, snr_step, fix_path=None, ):
-    csi_loader = CsiDataloader(data_path, train_data_radio=1)
     xp = csi_loader.get_pilot_x()
-    h = csi_loader.get_h(DataType.train)[:2000 // csi_loader.n_t]
+    h = csi_loader.get_h(DataType.train)
     hx = h @ xp
     h_len = h.shape[0] * csi_loader.n_sc
 
@@ -256,6 +255,7 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
 
     get_true_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
     for snr in range(snr_start, snr_end, snr_step):
+        logging.info("start snr:{}".format(snr))
         n, var = csi_loader.noise_snr_range(hx, [snr, snr + 1], one_col=False)
         y = hx + n
         h_hat = DenoisingMethodLS().get_h_hat(y, h, xp, var, csi_loader.rhh)
@@ -323,7 +323,7 @@ if __name__ == '__main__':
 
     cp = 20
     data_path = 'data/imt_2020_64_32_64_400.mat'
-    csi_loader = CsiDataloader(data_path, train_data_radio=1)
+    csi_loader = CsiDataloader(data_path, train_data_radio=0.8)
     n_r = csi_loader.n_r
     n_sc = csi_loader.n_sc
 
@@ -339,12 +339,12 @@ if __name__ == '__main__':
     model_cnn.name = 'cnn'
 
     dft_chuck_test_list = []
-    # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
+    dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
     # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_cnn))
 
     # var-test
-    dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
-    dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
 
     # ks-test
     dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
@@ -362,11 +362,10 @@ if __name__ == '__main__':
     # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
     # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
 
-    cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=25,
-                              snr_step=2)
-    # cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=15,
-    #                      snr_step=1,
-    #                      fix_path=10)
+    # cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=25,
+    #                           snr_step=2)
+    cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=5,
+                         snr_step=1,)
 
     # analysis_dft_denosing(data_path=data_path, fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)

@@ -1,11 +1,10 @@
 import abc
-from loader.CsiDataloader import CsiDataloader
 import torch
 
 from model import CBDNetBaseModel
 from utils import complex2real, conj_t
 
-import utils.config as config
+import config.config as config
 
 
 class DenoisingMethod(abc.ABC):

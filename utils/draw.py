@@ -47,6 +47,10 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save
         for k in y_dict.keys():
             if not isinstance(y_dict[k], list):
                 y_dict[k] = y_dict[k].tolist()
+            for i in range(len(y_dict[k])):
+                if not isinstance(y_dict[k][i], (int, float, )):
+                    y_dict[k][i] = y_dict[k][i].item()
+
         data_json = {
             'title': title,
             'x': x,
