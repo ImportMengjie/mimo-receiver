@@ -1,7 +1,9 @@
 import abc
 import logging
+from enum import Enum
 
 import numpy as np
+import scipy.fftpack as sp
 import scipy.stats
 import torch
 
@@ -13,61 +15,115 @@ import config.config as config
 use_gpu = config.USE_GPU and True
 
 
-class DftChuckTestMethod(abc.ABC):
+class Transform(Enum):
+    dft = 1
+    dct = 2
 
-    def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False, min_path=0):
-        self.testMethod = testMethod
+
+class DftChuckMethod(abc.ABC):
+
+    def __init__(self, n_r, n_sc, cp, min_path, full_name):
         self.n_r = n_r
         self.n_sc = n_sc
         self.cp = cp
+        self.min_path = min_path
+        self.full_name = full_name
+
+    @abc.abstractmethod
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+        pass
+
+    @abc.abstractmethod
+    def name(self):
+        pass
+
+
+class DftChuckThresholdMethod(DftChuckMethod):
+
+    def name(self):
+        return 'threshold-{}'.format(self.transform.name)
+
+    def __init__(self, n_r, n_sc, cp, min_path, full_name, transform=Transform.dft):
+        super().__init__(n_r, n_sc, cp, min_path, full_name)
+        self.transform = transform
+
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+        if self.transform == Transform.dft:
+            g_hat_time = g_hat_idft
+        else:
+            g_hat_time = g_hat_idct
+        miu = (np.abs(g_hat_time[:self.cp]) ** 2).mean()
+        for i in range(self.cp - 1, self.min_path, -1):
+            g_hat_row = g_hat_time[i, :]
+            miu_row = (np.abs(g_hat_row) ** 2).mean()
+            if miu <= miu_row:
+                return i + 1, miu_row
+        return self.min_path, None
+
+
+class DftChuckTestMethod(DftChuckMethod):
+
+    def __init__(self, n_r, n_sc, cp, transform: Transform, a=0.1, use_true_var=False,
+                 testMethod: TestMethod = TestMethod.one_row, full_name=False, min_path=2):
+        super().__init__(n_r, n_sc, cp, min_path, full_name)
+        self.testMethod = testMethod
         self.a = a
         self.not_cp = n_r - cp
         self.use_true_var = use_true_var
-        self.full_name = full_name
         self.first = True
         self.update_est_var = False
-        self.min_path = min_path
+        self.transform = transform
 
-    def get_path_count(self, g_hat_idft: np.ndarray, g_hat, true_var) -> (int, any):
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+        if self.transform == Transform.dft:
+            g_hat_time = g_hat_idft
+        else:
+            g_hat_time = g_hat_idct
         probability_list = []
         if self.testMethod == TestMethod.one_row:
-            g_hat_idft = np.concatenate((g_hat_idft.real, g_hat_idft.imag), axis=1)
-            est_var = (g_hat_idft[self.cp:] ** 2).mean()
-            true_var = true_var / self.n_sc
+            g_hat_time = np.concatenate((g_hat_time.real, g_hat_time.imag), axis=1)
+            est_var = (g_hat_time[self.cp:] ** 2).mean()
+            if self.transform == Transform.dft:
+                true_var = true_var / self.n_sc
             for i in range(self.cp - 1, self.min_path, -1):
-                idft_row = g_hat_idft[i].flatten()
+                time_row = g_hat_time[i].flatten()
                 if self.update_est_var:
-                    est_var = (g_hat_idft[i + 1:] ** 2).mean()
-                is_path, probability = self.test_one_row(idft_row, est_var, true_var, i, g_hat_idft)
+                    est_var = (g_hat_time[i + 1:] ** 2).mean()
+                is_path, probability = self.test_one_row(time_row, est_var, true_var, i, g_hat_time)
                 probability_list.append(probability)
                 if is_path:
                     return i + 1, probability_list
         elif self.testMethod == TestMethod.whole_noise:
-            g_hat_idft = np.concatenate((g_hat_idft.real, g_hat_idft.imag), axis=1)
-            est_var = (g_hat_idft[self.cp:] ** 2).mean()
-            true_var = true_var / self.n_sc
+            g_hat_time = np.concatenate((g_hat_time.real, g_hat_time.imag), axis=1)
+            est_var = (g_hat_time[self.cp:] ** 2).mean()
+            if self.transform == Transform.dft:
+                true_var = true_var / self.n_sc
             for i in range(self.cp - 1, self.min_path, -1):
                 if self.update_est_var:
-                    est_var = (g_hat_idft[i + 1:] ** 2).mean()
-                idft_rows = g_hat_idft[i:].flatten()
-                is_path, probability = self.test_whole_noise(idft_rows, est_var, true_var, i, g_hat_idft)
+                    est_var = (g_hat_time[i + 1:] ** 2).mean()
+                time_rows = g_hat_time[i:].flatten()
+                is_path, probability = self.test_whole_noise(time_rows, est_var, true_var, i, g_hat_time)
                 probability_list.append(probability)
                 if is_path:
                     return i + 1, probability_list
         elif self.testMethod == TestMethod.dft_diff:
             chuck_array = np.concatenate((np.ones(self.cp), np.zeros(self.n_sc - self.cp))).reshape((-1, 1))
-            est_cp_var = (np.abs(g_hat_idft[self.cp:]) ** 2).mean()
+            est_cp_var = (np.abs(g_hat_time[self.cp:]) ** 2).mean()
             true_var_o = true_var
             for i in range(self.cp - 1, self.min_path, -1):
                 if self.update_est_var:
-                    est_var = (np.abs(g_hat_idft[i + 1:]) ** 2).mean() * (self.n_sc - i) / 2
+                    est_var = (np.abs(g_hat_time[i + 1:]) ** 2).mean() * (self.n_sc - i) / 2
                 else:
                     est_var = est_cp_var * (self.n_sc - i) / 2
                 true_var = true_var_o * (self.n_sc - i) / self.n_sc
+                if self.transform == Transform.dct:
+                    est_var = est_var / self.n_sc
                 chuck_array[i] = 0
-                idft_g_chuck = g_hat_idft * chuck_array
-                g_chuck = np.fft.fft(idft_g_chuck, axis=0)
+                time_g_chuck = g_hat_time * chuck_array
+                if self.transform == Transform.dft:
+                    g_chuck = np.fft.fft(time_g_chuck, axis=0)
+                else:
+                    g_chuck = sp.dct(time_g_chuck, axis=0, norm='ortho')
                 dft_diff = g_hat - g_chuck
                 dft_diff = np.concatenate(
                     [dft_diff.real.reshape(dft_diff.shape + (1,)), dft_diff.imag.reshape(dft_diff.shape + (1,))], -1)
@@ -129,8 +185,9 @@ class ModelPathestMethod(DftChuckTestMethod):
     def name(self):
         return self.model.name
 
-    def __init__(self, n_r, n_sc, cp, model: PathEstBaseModel, use_true_var=False, full_name=False):
-        super().__init__(n_r, n_sc, cp, 0.05, use_true_var, model.test_method, full_name)
+    def __init__(self, n_r, n_sc, cp, model: PathEstBaseModel, transform: Transform = Transform.dft, use_true_var=False,
+                 full_name=False):
+        super().__init__(n_r, n_sc, cp, transform, 0.05, use_true_var, model.test_method, full_name, )
         self.model = model
         model.use_true_var = use_true_var
 
@@ -157,11 +214,12 @@ class VarTestMethod(DftChuckTestMethod):
         return p <= self.a, p
 
     def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
+                 full_name=False, transform: Transform = Transform.dft):
+        super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
+                         full_name=full_name, )
 
     def name(self):
-        return 'var-test-{}'.format(self.testMethod.name)
+        return 'var-test-{}-{}'.format(self.testMethod.name, self.transform.name)
 
 
 class SWTestMethod(DftChuckTestMethod):
@@ -179,11 +237,12 @@ class SWTestMethod(DftChuckTestMethod):
         return p <= self.a, p
 
     def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
+                 full_name=False, transform: Transform = Transform.dft):
+        super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
+                         full_name=full_name)
 
     def name(self):
-        return 'sw-test-{}'.format(self.testMethod.name)
+        return 'sw-test-{}-{}'.format(self.testMethod.name, self.transform.name)
 
 
 class KSTestMethod(DftChuckTestMethod):
@@ -208,12 +267,13 @@ class KSTestMethod(DftChuckTestMethod):
 
     def __init__(self, n_r, n_sc, cp, two_samp=True, a=0.1, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
+                 full_name=False, transform: Transform = Transform.dft):
+        super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
+                         full_name=full_name)
         self.two_samp = two_samp
 
     def name(self):
-        n = 'ks-test-{}'.format(self.testMethod.name)
+        n = 'ks-test-{}-{}'.format(self.testMethod.name, self.transform.name)
         # if self.testMethod == TestMethod.one_row:
         #     n += '-ts{}'.format(self.two_samp)
         return n
@@ -236,12 +296,13 @@ class ADTestMethod(DftChuckTestMethod):
 
     def __init__(self, n_r, n_sc, cp, significance_level=4, a=0.1, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
+                 full_name=False, transform: Transform = Transform.dft):
+        super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
+                         full_name=full_name)
         self.significance_level = significance_level
 
     def name(self):
-        return 'ad-test-{}'.format(self.testMethod.name)
+        return 'ad-test-{}-{}'.format(self.testMethod.name, self.transform.name)
 
 
 class NormalTestMethod(DftChuckTestMethod):
@@ -259,8 +320,9 @@ class NormalTestMethod(DftChuckTestMethod):
         return p <= self.a, p
 
     def __init__(self, n_r, n_sc, cp, a=0.1, use_true_var=False, testMethod: TestMethod = TestMethod.one_row,
-                 full_name=False):
-        super().__init__(n_r, n_sc, cp, a=a, use_true_var=use_true_var, testMethod=testMethod, full_name=full_name)
+                 full_name=False, transform: Transform = Transform.dft):
+        super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
+                         full_name=full_name)
 
     def name(self):
-        return 'normal-test-{}'.format(self.testMethod.name)
+        return 'normal-test-{}-{}'.format(self.testMethod.name, self.transform.name)

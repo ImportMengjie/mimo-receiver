@@ -4,6 +4,7 @@ from typing import List
 import PIL.Image
 import numpy as np
 import torch
+import scipy.fftpack as sp
 
 import config.config as config
 from loader import CsiDataloader, DataType
@@ -11,7 +12,7 @@ from model import CBDNetSFModel
 from train import load_model_from_file
 from utils.DenoisingMethod import DenoisingMethodMMSE, DenoisingMethodIdealMMSE, DenoisingMethodLS
 from utils.InterpolationMethod import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel, \
-    InterpolationMethodChuck
+    InterpolationMethodChuck, InterpolationMethodDct
 from utils.draw import draw_line, draw_point_and_line
 from utils.InterpolationMethod import line_interpolation_hp_pilot, complex2real
 
@@ -19,6 +20,57 @@ use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
 
 denosing_method_list = [DenoisingMethodMMSE(), DenoisingMethodIdealMMSE()]
+
+
+def analysis_window(csi_dataloader: CsiDataloader):
+    def draw(H: np.ndarray, name: str, j, n_r=None):
+        """
+        :param H: (J,N_t,K,N_r)
+        :param name:
+        :return:
+        """
+        J, N_t, K, N_r = H.shape
+        h = np.fft.ifft(H, axis=-2)
+        per_pic_num = 1
+        for i in range(0, N_t, per_pic_num):
+            draw_dict = {'{}-{}-{}'.format(j, m, name): None for m in range(i, min(i + per_pic_num, N_t))}
+            for m in range(i, min(i + per_pic_num, N_t)):
+                if n_r is not None:
+                    power = np.abs(h[j, m, :, n_r]) ** 2
+                    draw_dict['{}-{}-{}'.format(j, m, name)] = power
+                else:
+                    power = np.abs(h[j, m, :, :]) ** 2
+            draw_line(x=list(range(0, K)), y_dict=draw_dict, xlabel='K', ylabel='power', title=name,
+                      diff_line_markers=True)
+
+    def draw_one_h(h_list: List[np.ndarray], name_list: List[str], n_r=None, path_count=None, mold=True):
+        draw_dict = {}
+        for i in range(len(h_list)):
+            if n_r is not None:
+                draw_dict[name_list[i]] = abs(h_list[i][:, n_r])
+                if not mold:
+                    draw_dict[name_list[i]] = draw_dict[name_list[i]]**2
+            else:
+                pass
+        ylabel = 'mold' if mold else 'power'
+        draw_line(x=list(range(0, h_list[0].shape[0])), y_dict=draw_dict, xlabel='K', ylabel=ylabel, title='path count{}'.format(path_count))
+
+    H = csi_dataloader.get_h(DataType.test)
+
+    H = H.permute(0, 3, 1, 2)
+    H = H.numpy()
+    ifft_h = np.fft.ifft(H, axis=-2)
+    idct_h = sp.idct(H, axis=-2, norm='ortho')
+    j = 0
+    m = 20
+    n_r = 0
+    draw_one_h([ifft_h[j, m], idct_h[j, m]], ['ifft', 'idct'], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    draw_one_h([ifft_h[j, m]], ['ifft',], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    draw_one_h([idct_h[j, m]], ['idct'], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+
 
 
 def analysis_interpolation_pilot_data(csi_dataloader: CsiDataloader,
@@ -146,10 +198,43 @@ def analysis_h_visualization(csi_dataloader: CsiDataloader, snr, model_pilot_cou
     draw_g(save_path('g_out'), g_out, model)
 
 
-def cmp_model_and_base_method(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_end, snr_step,
-                              model_pilot_count, noise_level_conv, noise_channel, noise_dnn, denoising_conv,
-                              denoising_channel, kernel_size, use_two_dim, use_true_sigma, only_return_noise_level,
-                              extra='', show_name=None, dft_chuck=0, use_dft_padding=False):
+def cmp_model_and_base_method(interpolation_methods, csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step):
+    draw_pilot_and_data_nmse(csi_dataloader, interpolation_methods, snr_start=snr_start, snr_end=snr_end,
+                             snr_step=snr_step)
+
+
+def cmp_model_block(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step, noise_level_conv, noise_channel,
+                    noise_dnn, denoising_conv,
+                    denoising_channel, kernel_size, use_two_dim, use_true_sigma, only_return_noise_level,
+                    extra='', show_name=None, dft_chuck=0, use_dft_padding=False):
+    model = CBDNetSFModel(csi_dataloader, csi_dataloader.n_sc, noise_level_conv=noise_level_conv,
+                          noise_channel=noise_channel, noise_dnn=noise_dnn, denoising_conv=denoising_conv,
+                          denoising_channel=denoising_channel, kernel_size=kernel_size, use_two_dim=use_two_dim,
+                          use_true_sigma=use_true_sigma, only_return_noise_level=only_return_noise_level, extra=extra,
+                          dft_chuck=dft_chuck, use_dft_padding=use_dft_padding)
+    model = load_model_from_file(model, use_gpu)
+    chuck_array = csi_dataloader.get_chuck_array(DataType.test)
+    if show_name:
+        model.name = show_name
+    interpolation_methods = [
+        InterpolationMethodLine(csi_dataloader.n_sc, csi_dataloader.n_sc, DenoisingMethodLS()),
+        # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
+        InterpolationMethodChuck(csi_dataloader.n_sc, csi_dataloader.n_sc, chuck_array, DenoisingMethodLS()),
+        InterpolationMethodDct(csi_dataloader.n_sc, csi_dataloader.n_sc, chuck_array, DenoisingMethodLS())
+        # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
+        # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodMMSE()),
+        # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodLS()),
+        # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodMMSE(), True),
+        # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE(), True),
+        # InterpolationMethodModel(model, use_gpu, pilot_count)
+    ]
+    cmp_model_and_base_method(interpolation_methods, csi_dataloader, snr_start, snr_end, snr_step)
+
+
+def cmp_model_comb(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_end, snr_step,
+                   model_pilot_count, noise_level_conv, noise_channel, noise_dnn, denoising_conv,
+                   denoising_channel, kernel_size, use_two_dim, use_true_sigma, only_return_noise_level,
+                   extra='', show_name=None, dft_chuck=0, use_dft_padding=False):
     model = CBDNetSFModel(csi_dataloader, model_pilot_count, noise_level_conv=noise_level_conv,
                           noise_channel=noise_channel, noise_dnn=noise_dnn, denoising_conv=denoising_conv,
                           denoising_channel=denoising_channel, kernel_size=kernel_size, use_two_dim=use_two_dim,
@@ -158,10 +243,12 @@ def cmp_model_and_base_method(csi_dataloader: CsiDataloader, pilot_count, snr_st
     model = load_model_from_file(model, use_gpu)
     if show_name:
         model.name = show_name
+    chuck_array = csi_dataloader.get_chuck_array(DataType.test)
     interpolation_methods = [
         InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
-        InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE()),
+        InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, chuck_array, DenoisingMethodIdealMMSE()),
+        InterpolationMethodDct(csi_dataloader.n_sc, pilot_count, chuck_array, DenoisingMethodIdealMMSE())
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodMMSE()),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodLS()),
@@ -330,18 +417,26 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/imt_2020_64_32_64_400.mat', train_data_radio=0.8)
+    csi_dataloader = CsiDataloader('data/imt_2020_64_32_1024_100.mat', train_data_radio=0.98)
     # analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
     #                          model_pilot_count=63, noise_level_conv=4, noise_channel=32,
     #                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
     #                          use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='',
     #                          dft_chuck=10, use_dft_padding=False)
+    analysis_window(csi_dataloader)
 
-    cmp_model_and_base_method(csi_dataloader=csi_dataloader, pilot_count=31, snr_start=0, snr_end=31, snr_step=2,
-                              model_pilot_count=31, noise_level_conv=4, noise_channel=32,
-                              noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
-                              use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
-                              show_name='CBD-SF', dft_chuck=10)
+    # block
+    # cmp_model_block(csi_dataloader=csi_dataloader, snr_start=0, snr_end=31, snr_step=2, noise_level_conv=4,
+    #                 noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
+    #                 kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True, only_return_noise_level=False,
+    #                 extra='l10', show_name='CBD-SF', dft_chuck=10)
+
+    # s
+    # cmp_model_comb(csi_dataloader=csi_dataloader, pilot_count=125, snr_start=0, snr_end=31, snr_step=2,
+    #                model_pilot_count=31, noise_level_conv=4, noise_channel=32,
+    #                noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
+    #                use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
+    #                show_name='CBD-SF', dft_chuck=10)
 
     # analysis_noise_level(csi_dataloader=csi_dataloader, pilot_count=63, snr_list=[15, 20, 25], noise_level_conv=3,
     #                      noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,

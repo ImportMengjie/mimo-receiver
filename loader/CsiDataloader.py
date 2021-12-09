@@ -131,7 +131,8 @@ class CsiDataloader:
                                                                                self.test_H.shape[0]))
 
     def _get_path_count(self, j: int, m: int):
-        return int(self.path_count[j * self.n_t + m].item()) + 32
+        return int(self.path_count[j * self.n_t + m].item())
+        # return 128
 
     def get_path_count(self, dataType: DataType, j, m):
         if dataType == DataType.train:
@@ -140,6 +141,7 @@ class CsiDataloader:
             return self._get_path_count(j + self.train_count, m)
 
     def gen_chuck_array(self, path_count):
+        # return np.concatenate((np.ones(path_count), np.zeros(self.n_sc - 2*path_count), np.ones(path_count)))
         return np.concatenate((np.ones(path_count), np.zeros(self.n_sc - path_count)))
 
     def get_chuck_array(self, dataType: DataType):

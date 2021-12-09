@@ -7,8 +7,9 @@ from train import load_model_from_file
 from utils import DenoisingMethodLS
 from utils import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod, ModelPathestMethod
 from utils import draw_line
-from utils.DftChuckTestMethod import TestMethod
+from utils.DftChuckTestMethod import TestMethod, Transform, DftChuckThresholdMethod
 import config.config as config
+import scipy.fftpack as sp
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -182,27 +183,40 @@ def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, sn
         g_hat = h_hat.permute(0, 3, 1, 2).numpy().reshape(-1, csi_loader.n_sc, csi_loader.n_r)
         g = h.permute(0, 3, 1, 2).numpy().reshape(-1, csi_loader.n_sc, csi_loader.n_r)
         g_hat_idft = np.fft.ifft(g_hat, axis=-2)
+        g_hat_idct = sp.idct(g_hat, axis=-2, norm='ortho')
 
         for i in range(g_hat.shape[0]):
             i_g = g[i]
             i_g_hat_idft = g_hat_idft[i]
+            i_g_hat_idct = g_hat_idct[i]
             i_g_hat = g_hat[i]
             true_var = var[i // csi_loader.n_t, 0, 0].item() / 2
-            path_mse_dict = {}
+            path_mse_dict_dft = {}
+            path_mse_dict_dct = {}
 
-            def get_path_hat_mse(path_hat: int):
-                if path_hat not in path_mse_dict:
-                    chuck_array = np.concatenate((np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
-                        (-1, 1))
-                    i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
-                    i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2)
-                    path_mse_dict[path_hat] = (np.abs(i_g_hat_chuck - i_g) ** 2).sum(-1).sum(-1) / (
-                            np.abs(i_g) ** 2).sum(-1).sum(-1)
-                return path_mse_dict[path_hat]
+            def get_path_hat_mse(path_hat: int, t: Transform):
+                if t == Transform.dft:
+                    if path_hat not in path_mse_dict_dft:
+                        chuck_array = np.concatenate((np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
+                            (-1, 1))
+                        i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
+                        i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2)
+                        path_mse_dict_dft[path_hat] = (np.abs(i_g_hat_chuck - i_g) ** 2).sum(-1).sum(-1) / (
+                                np.abs(i_g) ** 2).sum(-1).sum(-1)
+                    return path_mse_dict_dft[path_hat]
+                else:
+                    if path_hat not in path_mse_dict_dct:
+                        chuck_array = np.concatenate((np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
+                            (-1, 1))
+                        i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
+                        i_g_hat_chuck = sp.dct(i_g_hat_chuck_idft, axis=-2, norm='ortho')
+                        path_mse_dict_dft[path_hat] = (np.abs(i_g_hat_chuck - i_g) ** 2).sum(-1).sum(-1) / (
+                                np.abs(i_g) ** 2).sum(-1).sum(-1)
+                    return path_mse_dict_dft[path_hat]
 
             if draw_nmse:
-                ls_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(csi_loader.n_sc)
-                dft_chuck_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(get_path_count(i))
+                ls_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(csi_loader.n_sc, Transform.dft)
+                dft_chuck_mse[(snr - snr_start) // snr_step] += get_path_hat_mse(get_path_count(i), Transform.dft)
 
             for dft_idx in range(len(dft_chuck_test_list)):
                 snr_total_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
@@ -252,6 +266,7 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
     snr_h_mse = [[0 for _ in range(snr_start, snr_end, snr_step)] for _ in dft_chuck_test_list]
     snr_h_ls_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
     snr_h_dft_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
+    snr_h_dct_mse = [0 for _ in range(snr_start, snr_end, snr_step)]
 
     get_true_path_count = lambda idx: fix_path if fix_path is not None else csi_loader.path_count[idx]
     for snr in range(snr_start, snr_end, snr_step):
@@ -262,36 +277,52 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
         g_hat = h_hat.permute(0, 3, 1, 2).numpy()
         g = h.permute(0, 3, 1, 2).numpy()
         g_hat_idft = np.fft.ifft(g_hat, axis=-2)
+        g_hat_idct = sp.idct(g_hat, axis=-2, norm='ortho')
         for j in range(g.shape[0]):
-            j_h_chuck = [None for _ in range(len(dft_chuck_test_list) + 2)]
+            j_h_chuck = [None for _ in range(len(dft_chuck_test_list) + 3)]
             true_var = var[j, 0, 0].item() / 2
             for m in range(g.shape[1]):
                 i_g_hat = g_hat[j][m]
                 i_g_hat_idft = g_hat_idft[j][m]
-                path_g_dict = {}
+                i_g_hat_idct = g_hat_idct[j][m]
+                path_g_dict_dft = {}
+                path_g_dict_dct = {}
 
-                def get_chuck_g(path_hat: int):
-                    if path_hat not in path_g_dict:
-                        chuck_array = np.concatenate((np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
-                            (-1, 1))
-                        i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
-                        i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2)
-                        path_g_dict[path_hat] = i_g_hat_chuck.reshape((1,) + i_g_hat_chuck.shape)
-                    return path_g_dict[path_hat]
-
-                def put_in_j_h_chuck(path_hat, idx):
-                    if j_h_chuck[idx] is None:
-                        j_h_chuck[idx] = get_chuck_g(path_hat)
+                def get_chuck_g(path_hat: int, t: Transform):
+                    if t == Transform.dft:
+                        if path_hat not in path_g_dict_dft:
+                            chuck_array = np.concatenate(
+                                (np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
+                                (-1, 1))
+                            i_g_hat_chuck_idft = i_g_hat_idft * chuck_array
+                            i_g_hat_chuck = np.fft.fft(i_g_hat_chuck_idft, axis=-2, )
+                            path_g_dict_dft[path_hat] = i_g_hat_chuck.reshape((1,) + i_g_hat_chuck.shape)
+                        return path_g_dict_dft[path_hat]
                     else:
-                        j_h_chuck[idx] = np.concatenate((j_h_chuck[idx], get_chuck_g(path_hat)), axis=0)
+                        if path_hat not in path_g_dict_dct:
+                            chuck_array = np.concatenate(
+                                (np.ones(path_hat), np.zeros(csi_loader.n_sc - path_hat))).reshape(
+                                (-1, 1))
+                            i_g_hat_chuck_idct = i_g_hat_idct * chuck_array
+                            i_g_hat_chuck = sp.dct(i_g_hat_chuck_idct, axis=-2, norm='ortho')
+                            path_g_dict_dct[path_hat] = i_g_hat_chuck.reshape((1,) + i_g_hat_chuck.shape)
+                        return path_g_dict_dct[path_hat]
+
+                def put_in_j_h_chuck(path_hat, idx, t: Transform):
+                    if j_h_chuck[idx] is None:
+                        j_h_chuck[idx] = get_chuck_g(path_hat, t)
+                    else:
+                        j_h_chuck[idx] = np.concatenate((j_h_chuck[idx], get_chuck_g(path_hat, t)), axis=0)
 
                 # ls
-                put_in_j_h_chuck(csi_loader.n_sc, -1)
-                # dft chuck
-                put_in_j_h_chuck(get_true_path_count(j * csi_loader.n_t + m), -2)
+                put_in_j_h_chuck(csi_loader.n_sc, -1, Transform.dft)
+                # cp chuck
+                put_in_j_h_chuck(cp, -2, Transform.dft)
+                put_in_j_h_chuck(cp, -3, Transform.dct)
                 for dft_idx in range(len(dft_chuck_test_list)):
-                    path_hat, p_list = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat, true_var)
-                    put_in_j_h_chuck(path_hat, dft_idx)
+                    path_hat, p_list = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat_idct, i_g_hat,
+                                                                                   true_var)
+                    put_in_j_h_chuck(path_hat, dft_idx, dft_chuck_test_list[dft_idx].transform)
 
             true_h = h[j].permute(2, 0, 1).numpy()
 
@@ -303,6 +334,7 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
                 snr_h_mse[dft_idx][(snr - snr_start) // snr_step] += calc_mse(dft_idx)
             snr_h_ls_mse[(snr - snr_start) // snr_step] += calc_mse(-1)
             snr_h_dft_mse[(snr - snr_start) // snr_step] += calc_mse(-2)
+            snr_h_dct_mse[(snr - snr_start) // snr_step] += calc_mse(-3)
 
     draw_h_nmse_dict = {}
     for dft_idx in range(len(dft_chuck_test_list)):
@@ -310,7 +342,8 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
         draw_h_nmse_dict[dft_chuck_test_list[dft_idx].name()] = 10 * np.log10(mse_sum / h_len)
 
     draw_h_nmse_dict['ls'] = 10 * np.log10(np.array(snr_h_ls_mse) / h_len)
-    draw_h_nmse_dict['dft_chuck'] = 10 * np.log10(np.array(snr_h_dft_mse) / h_len)
+    draw_h_nmse_dict['dft_cp_chuck'] = 10 * np.log10(np.array(snr_h_dft_mse) / h_len)
+    draw_h_nmse_dict['dct_cp_chuck'] = 10 * np.log10(np.array(snr_h_dct_mse) / h_len)
 
     draw_line(list(range(snr_start, snr_end, snr_step)), draw_h_nmse_dict,
               '{}-path-est-h-nmse-cmp'.format(csi_loader), diff_line_markers=True, save_dir=config.PATHEST_RESULT_IMG)
@@ -321,9 +354,10 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    cp = 20
-    data_path = 'data/imt_2020_64_32_64_400.mat'
-    csi_loader = CsiDataloader(data_path, train_data_radio=0.8)
+    cp = 128
+    min_path = 1
+    data_path = 'data/imt_2020_64_32_512_100.mat'
+    csi_loader = CsiDataloader(data_path, train_data_radio=0.1)
     n_r = csi_loader.n_r
     n_sc = csi_loader.n_sc
 
@@ -339,16 +373,26 @@ if __name__ == '__main__':
     model_cnn.name = 'cnn'
 
     dft_chuck_test_list = []
-    dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
+    # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
     # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_cnn))
+
+    # threshold
+    dft_chuck_test_list.append(
+        DftChuckThresholdMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
+    dft_chuck_test_list.append(
+        DftChuckThresholdMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dct))
 
     # var-test
     # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
     # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(
+    #     VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.one_row))
+    dft_chuck_test_list.append(
+        VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.dft_diff))
 
     # ks-test
-    dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
-    dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
 
     # ad-test
     # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
@@ -362,10 +406,10 @@ if __name__ == '__main__':
     # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
     # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
 
-    # cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=25,
-    #                           snr_step=2)
-    cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=5,
-                         snr_step=1,)
+    cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=15,
+                              snr_step=2)
+    # cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=5,
+    #                      snr_step=1,)
 
     # analysis_dft_denosing(data_path=data_path, fix_snr=2, max_count=3, path_start=1,
     #                       path_end=20)

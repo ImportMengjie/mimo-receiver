@@ -24,9 +24,11 @@ from utils.InterpolationMethod import InterpolationMethod
 from utils.InterpolationMethod import InterpolationMethodLine
 from utils.InterpolationMethod import InterpolationMethodChuck
 from utils.InterpolationMethod import InterpolationMethodModel
+from utils.InterpolationMethod import InterpolationMethodDct
 
 from utils.model import Padding, ConvReluBlock, ConvBnReluBlock
 
-from utils.DftChuckTestMethod import DftChuckTestMethod
+from utils.DftChuckTestMethod import DftChuckTestMethod, DftChuckMethod
 from utils.DftChuckTestMethod import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod
-from  utils.DftChuckTestMethod import ModelPathestMethod
+from utils.DftChuckTestMethod import ModelPathestMethod, DftChuckThresholdMethod
+from utils.DftChuckTestMethod import Transform

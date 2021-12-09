@@ -8,7 +8,7 @@ clear ;
 
 N_r = 64
 N_t = 32
-N_sc = 1024
+N_sc = 512
 J = 200
 sim = 1
 sce = 'UMa_A'

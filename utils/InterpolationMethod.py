@@ -1,4 +1,6 @@
 import abc
+import math
+
 import torch
 import numpy as np
 
@@ -9,6 +11,7 @@ from utils import line_interpolation_hp_pilot
 from utils import get_interpolation_pilot_idx
 from utils import DenoisingMethod
 from config import config
+import scipy.fftpack as sp
 
 
 class InterpolationMethod(abc.ABC):
@@ -151,6 +154,81 @@ class InterpolationMethodChuck(InterpolationMethodLine):
             if self.padding_chuck:
                 H_p_in_time = H_p_in_time * self.path_chuck_array
             H_hat = np.fft.fft(H_p_in_time, axis=-2)
+
+            # H_hat_in_time = np.fft.ifft2(H_hat)
+            # H_hat_in_time = H_hat_in_time * self.chuck_array
+            # H_hat = np.fft.fft2(H_hat_in_time)
+
+        H_hat = torch.from_numpy(H_hat)
+        H_hat = H_hat.permute(0, 2, 3, 1)
+        return H_hat
+
+
+class InterpolationMethodDct(InterpolationMethodLine):
+
+    def __init__(self, n_sc, pilot_count: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
+                 extra=''):
+        super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
+        self.path_chuck_array = path_chuck_array
+
+    def get_key_name(self):
+        if self.is_denosing:
+            key_name = 'dct-chuck'
+        else:
+            key_name = 'dct-padding'
+        if self.denoisingMethod:
+            key_name += '-' + self.denoisingMethod.get_key_name()
+        return key_name + self.extra
+
+    def get_pilot_name(self):
+        if self.denoisingMethod:
+            if self.is_denosing:
+                ret_name = 'dct-chuck-'
+            else:
+                ret_name = 'dct-padding-'
+
+            return ret_name + self.denoisingMethod.get_key_name()
+        else:
+            return 'chuck-true'
+
+    def get_H_hat(self, y, H, xp, var, rhh):
+        def hanning(M, S=1.1):
+            a = np.arange(-int(M) // 2, int(M) // 2)
+            ans = 0.5 * (1 + np.cos(2 * np.pi * a / (S * M))) * np.e ** (-1j * 4 * np.pi * a / M)
+            return ans
+
+        def hamming(M):
+            m = np.arange(0, M)
+            ans = 0.54 + 0.46 * np.cos(2 * np.pi * m / M)
+            return ans.reshape((-1, 1))
+
+        h_p = H[:, self.pilot_idx]
+        if self.denoisingMethod is not None:
+            y = y[:, self.pilot_idx]
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        if self.n_sc == self.pilot_count:
+            H_hat = h_p
+            H_hat = H_hat.permute(0, 3, 1, 2)
+            H_hat = H_hat.numpy()
+            # H_hat_w = H_hat * hamming(self.n_sc*2)[:self.n_sc].reshape((-1, 1))
+            # H_hat_in_time = np.fft.ifft(H_hat, axis=-2)
+            # H_hat_in_time = H_hat_in_time * self.path_chuck_array
+            # H_hat = np.fft.fft(H_hat_in_time, axis=-2)
+            H_hat_in_time = sp.idct(H_hat, axis=-2, norm='ortho')
+            H_hat_in_time = H_hat_in_time * self.path_chuck_array
+            H_hat = sp.dct(H_hat_in_time, axis=-2, norm='ortho')
+        else:
+            h_p = h_p.permute(0, 3, 1, 2)
+            h_p = h_p.numpy()
+            h_p = h_p * np.hamming(self.pilot_count).reshape((-1, 1))
+            h_p_in_time = np.fft.ifft(h_p, axis=-2)
+            split_idx = self.pilot_count // 2
+            zeros_count = self.n_sc - self.pilot_count
+            H_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
+                                          np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                          h_p_in_time[:, :, split_idx:]), axis=-2)
+            H_hat = np.fft.fft(H_p_in_time, axis=-2)
+            H_hat = H_hat * np.hamming(self.n_sc).reshape((-1, 1))
 
             # H_hat_in_time = np.fft.ifft2(H_hat)
             # H_hat_in_time = H_hat_in_time * self.chuck_array
