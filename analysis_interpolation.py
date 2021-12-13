@@ -14,7 +14,7 @@ from utils.DenoisingMethod import DenoisingMethodMMSE, DenoisingMethodIdealMMSE,
 from utils.InterpolationMethod import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel, \
     InterpolationMethodChuck, InterpolationMethodDct
 from utils.draw import draw_line, draw_point_and_line
-from utils.InterpolationMethod import line_interpolation_hp_pilot, complex2real
+from utils.common import line_interpolation_hp_pilot, complex2real, get_interpolation_idx_nf
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -29,7 +29,6 @@ def analysis_window(csi_dataloader: CsiDataloader):
         :param name:
         :return:
         """
-        J, N_t, K, N_r = H.shape
         h = np.fft.ifft(H, axis=-2)
         per_pic_num = 1
         for i in range(0, N_t, per_pic_num):
@@ -49,28 +48,43 @@ def analysis_window(csi_dataloader: CsiDataloader):
             if n_r is not None:
                 draw_dict[name_list[i]] = abs(h_list[i][:, n_r])
                 if not mold:
-                    draw_dict[name_list[i]] = draw_dict[name_list[i]]**2
+                    draw_dict[name_list[i]] = draw_dict[name_list[i]] ** 2
             else:
                 pass
         ylabel = 'mold' if mold else 'power'
-        draw_line(x=list(range(0, h_list[0].shape[0])), y_dict=draw_dict, xlabel='K', ylabel=ylabel, title='path count{}'.format(path_count))
+        draw_line(x=list(range(0, h_list[0].shape[0])), y_dict=draw_dict, xlabel='K', ylabel=ylabel,
+                  title='path count{}'.format(path_count))
 
     H = csi_dataloader.get_h(DataType.test)
 
     H = H.permute(0, 3, 1, 2)
     H = H.numpy()
+    J, N_t, K, N_r = H.shape
     ifft_h = np.fft.ifft(H, axis=-2)
     idct_h = sp.idct(H, axis=-2, norm='ortho')
     j = 0
     m = 20
     n_r = 0
-    draw_one_h([ifft_h[j, m], idct_h[j, m]], ['ifft', 'idct'], n_r=n_r,
-               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
-    draw_one_h([ifft_h[j, m]], ['ifft',], n_r=n_r,
-               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
-    draw_one_h([idct_h[j, m]], ['idct'], n_r=n_r,
-               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    # draw_one_h([ifft_h[j, m], idct_h[j, m]], ['ifft', 'idct'], n_r=n_r,
+    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    # draw_one_h([ifft_h[j, m]], ['ifft', ], n_r=n_r,
+    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    # draw_one_h([idct_h[j, m]], ['idct'], n_r=n_r,
+    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
 
+    padding_h = []
+    padding_name = []
+    # padding
+    for n_f in range(1, 4):
+        idx = get_interpolation_idx_nf(K, n_f).numpy()
+        H_p = H[j, m, idx]
+        H_p_idft = np.fft.ifft(H_p, axis=0)
+        H_p_idft = np.concatenate((H_p_idft, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
+        H_p_idct = sp.idct(H_p, axis=0, norm='ortho')
+        H_p_idct = np.concatenate((H_p_idct, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
+        padding_h.extend([H_p_idft, H_p_idct])
+        padding_name.extend(['idft-{}'.format(n_f), 'idct-{}'.format(n_f)])
+    draw_one_h(padding_h, name_list=padding_name, n_r=n_r)
 
 
 def analysis_interpolation_pilot_data(csi_dataloader: CsiDataloader,
@@ -122,12 +136,11 @@ def draw_pilot_and_data_nmse(csi_dataloader: CsiDataloader, interpolation_method
                                                                            snr_end, snr_step)
     if is_denosing:
         title = 'block-denosing{}-{}'.format(n_sc, csi_dataloader.__str__())
+        draw_line(x, pilot_nmse_dict,
+                  title=title,
+                  save_dir=config.INTERPOLATION_RESULT_IMG)
     else:
         title = 'comb-interpolation-pilot{}|{}-{}'.format(pilot_count, n_sc, csi_dataloader.__str__())
-    draw_line(x, pilot_nmse_dict,
-              title=title,
-              save_dir=config.INTERPOLATION_RESULT_IMG)
-    if not is_denosing:
         draw_line(x, data_nmse_dict,
                   title='comb-interpolation-data{}|{}-{}'.format(n_sc - pilot_count, n_sc, csi_dataloader.__str__()),
                   save_dir=config.INTERPOLATION_RESULT_IMG)
@@ -217,10 +230,10 @@ def cmp_model_block(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step,
     if show_name:
         model.name = show_name
     interpolation_methods = [
-        InterpolationMethodLine(csi_dataloader.n_sc, csi_dataloader.n_sc, DenoisingMethodLS()),
+        InterpolationMethodLine(csi_dataloader.n_sc, 0, 'linear', DenoisingMethodLS()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
-        InterpolationMethodChuck(csi_dataloader.n_sc, csi_dataloader.n_sc, chuck_array, DenoisingMethodLS()),
-        InterpolationMethodDct(csi_dataloader.n_sc, csi_dataloader.n_sc, chuck_array, DenoisingMethodLS())
+        InterpolationMethodChuck(csi_dataloader.n_sc, 0, chuck_array, DenoisingMethodLS()),
+        InterpolationMethodDct(csi_dataloader.n_sc, 0, chuck_array, DenoisingMethodLS())
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodMMSE()),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodLS()),
@@ -231,7 +244,7 @@ def cmp_model_block(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step,
     cmp_model_and_base_method(interpolation_methods, csi_dataloader, snr_start, snr_end, snr_step)
 
 
-def cmp_model_comb(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_end, snr_step,
+def cmp_model_comb(csi_dataloader: CsiDataloader, n_f, snr_start, snr_end, snr_step,
                    model_pilot_count, noise_level_conv, noise_channel, noise_dnn, denoising_conv,
                    denoising_channel, kernel_size, use_two_dim, use_true_sigma, only_return_noise_level,
                    extra='', show_name=None, dft_chuck=0, use_dft_padding=False):
@@ -245,10 +258,12 @@ def cmp_model_comb(csi_dataloader: CsiDataloader, pilot_count, snr_start, snr_en
         model.name = show_name
     chuck_array = csi_dataloader.get_chuck_array(DataType.test)
     interpolation_methods = [
-        InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodIdealMMSE()),
+        InterpolationMethodLine(csi_dataloader.n_sc, n_f, 'linear', DenoisingMethodLS()),
+        # InterpolationMethodLine(csi_dataloader.n_sc, n_f, 'quadratic', DenoisingMethodIdealMMSE()),
+        # InterpolationMethodLine(csi_dataloader.n_sc, n_f, 'cubic', DenoisingMethodIdealMMSE()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
-        InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, chuck_array, DenoisingMethodIdealMMSE()),
-        InterpolationMethodDct(csi_dataloader.n_sc, pilot_count, chuck_array, DenoisingMethodIdealMMSE())
+        InterpolationMethodChuck(csi_dataloader.n_sc, n_f, chuck_array, DenoisingMethodLS()),
+        InterpolationMethodDct(csi_dataloader.n_sc, n_f, chuck_array, DenoisingMethodLS())
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodMMSE()),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodLS()),
@@ -417,7 +432,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/imt_2020_64_32_1024_100.mat', train_data_radio=0.98)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9)
     # analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
     #                          model_pilot_count=63, noise_level_conv=4, noise_channel=32,
     #                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
@@ -431,8 +446,8 @@ if __name__ == '__main__':
     #                 kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True, only_return_noise_level=False,
     #                 extra='l10', show_name='CBD-SF', dft_chuck=10)
 
-    # s
-    # cmp_model_comb(csi_dataloader=csi_dataloader, pilot_count=125, snr_start=0, snr_end=31, snr_step=2,
+    # comb
+    # cmp_model_comb(csi_dataloader=csi_dataloader, n_f=1, snr_start=0, snr_end=31, snr_step=2,
     #                model_pilot_count=31, noise_level_conv=4, noise_channel=32,
     #                noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
     #                use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',

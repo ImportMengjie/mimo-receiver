@@ -1,6 +1,8 @@
 from enum import Enum
 
 import torch
+import numpy as np
+from scipy import interpolate
 
 
 class AvgLoss:
@@ -25,6 +27,15 @@ def complex2real(mat: torch.Tensor):
 
 def conj_t(mat: torch.Tensor):
     return mat.conj().transpose(-1, -2)
+
+
+def line_interpolation_hp_pilot_sp(h_p: torch.Tensor, pilot_idx: torch.Tensor, n_sc: int, kind='linear'):
+    h_p = h_p.numpy()
+    pilot_idx = pilot_idx.numpy()
+    x = np.arange(0, n_sc)[pilot_idx]
+    f = interpolate.interp1d(x, h_p, axis=1, kind=kind, fill_value='extrapolate')
+    h_new = f(np.arange(0, n_sc))
+    return torch.from_numpy(h_new)
 
 
 def line_interpolation_hp_pilot(h_p: torch.Tensor, pilot_idx: torch.Tensor, n_sc: int, use_abs_angle=True):
@@ -73,6 +84,16 @@ def get_interpolation_pilot_idx(n_sc: int, pilot_count: int):
             pilot_idx.append(False)
     pilot_idx.append(True)
     pilot_idx = torch.Tensor(pilot_idx).bool()
+    return pilot_idx
+
+
+def get_interpolation_idx_nf(n_sc: int, n_f: int):
+    n_f += 1
+    pilot_idx = []
+    for i in range(n_sc):
+        pilot_idx.append(i % n_f == 0)
+    pilot_idx = torch.Tensor(pilot_idx).bool()
+    pilot_idx[-1] = False
     return pilot_idx
 
 

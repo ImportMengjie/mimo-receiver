@@ -354,7 +354,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    cp = 128
+    cp = 64
     min_path = 1
     data_path = 'data/imt_2020_64_32_512_100.mat'
     csi_loader = CsiDataloader(data_path, train_data_radio=0.1)

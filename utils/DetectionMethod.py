@@ -97,6 +97,14 @@ class DetectionMethodModel(DetectionMethod):
         return x_hat
 
 
+class DetectionMethodML(DetectionMethod):
+    def get_key_name(self):
+        return 'ml'
+
+    def get_x_hat(self, y, h, x, var):
+        pass
+
+
 class DetectionMethodConjugateGradient(DetectionMethod):
 
     def __init__(self, modulation, iterate, name_add_iterate=True):
