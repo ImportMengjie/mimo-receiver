@@ -1,28 +1,26 @@
 import abc
-import math
 
-import torch
 import numpy as np
-
-from model import CBDNetSFModel
-
-from utils import complex2real, DenoisingMethodLS
-from utils import line_interpolation_hp_pilot
-from utils import get_interpolation_pilot_idx
-from utils import DenoisingMethod
-from config import config
 import scipy.fftpack as sp
+import torch
+
+from config import config
+from model import CBDNetSFModel
+from utils import DenoisingMethod
+from utils import complex2real, DenoisingMethodLS
+from utils import get_interpolation_idx_nf
+from utils import line_interpolation_hp_pilot_sp
 
 
 class InterpolationMethod(abc.ABC):
 
-    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None, only_est_data=False,
+    def __init__(self, n_sc, n_f: int, denoisingMethod: DenoisingMethod = None, only_est_data=False,
                  extra='') -> None:
-        assert not (denoisingMethod is None and self.only_est_data)
+        assert not (denoisingMethod is None and only_est_data)
         super().__init__()
         self.n_sc = n_sc
         self.denoisingMethod = denoisingMethod
-        self.pilot_idx = get_interpolation_pilot_idx(n_sc, pilot_count)
+        self.pilot_idx = get_interpolation_idx_nf(n_sc, n_f)
         self.pilot_count = torch.sum(self.pilot_idx).item()
         self.only_est_data = only_est_data
         self.extra = extra
@@ -66,18 +64,19 @@ class InterpolationMethod(abc.ABC):
 
 class InterpolationMethodLine(InterpolationMethod):
 
-    def __init__(self, n_sc, pilot_count: int, denoisingMethod: DenoisingMethod = None, only_data_est=False,
+    def __init__(self, n_sc, n_f: int, kind='linear', denoisingMethod: DenoisingMethod = None, only_data_est=False,
                  extra='') -> None:
-        super().__init__(n_sc, pilot_count, denoisingMethod, only_data_est, extra)
+        super().__init__(n_sc, n_f, denoisingMethod, only_data_est, extra)
+        self.kind = kind
 
     def get_key_name(self):
         if self.denoisingMethod:
             if self.only_est_data:
                 key_name = self.denoisingMethod.get_key_name()
             else:
-                key_name = 'line' + '-' + self.denoisingMethod.get_key_name()
+                key_name = self.kind + '-' + self.denoisingMethod.get_key_name()
         else:
-            key_name = 'line' + '-' + 'true'
+            key_name = self.kind + '-' + 'true'
         return key_name + self.extra
 
     def get_pilot_name(self):
@@ -94,15 +93,15 @@ class InterpolationMethodLine(InterpolationMethod):
             else:
                 y = y[:, self.pilot_idx]
                 h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
-        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc, False)
+        H_hat = line_interpolation_hp_pilot_sp(h_p, self.pilot_idx, self.n_sc, kind=self.kind)
         return H_hat
 
 
 class InterpolationMethodChuck(InterpolationMethodLine):
 
-    def __init__(self, n_sc, pilot_count: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
+    def __init__(self, n_sc, n_f: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
                  padding_chuck=False, extra=''):
-        super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
+        super().__init__(n_sc, n_f, 'linear', denoisingMethod, False, extra=extra)
         self.padding_chuck = padding_chuck
         self.path_chuck_array = path_chuck_array
 
@@ -145,19 +144,14 @@ class InterpolationMethodChuck(InterpolationMethodLine):
             h_p = h_p.permute(0, 3, 1, 2)
             h_p = h_p.numpy()
             h_p_in_time = np.fft.ifft(h_p, axis=-2)
-            # h_p_in_time = np.fft.ifft2(h_p)
-            split_idx = self.pilot_count
+            split_idx = self.pilot_count // 2
             zeros_count = self.n_sc - self.pilot_count
             H_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
                                           np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
                                           h_p_in_time[:, :, split_idx:]), axis=-2)
-            if self.padding_chuck:
-                H_p_in_time = H_p_in_time * self.path_chuck_array
+            # if self.padding_chuck:
+            H_p_in_time = H_p_in_time * self.path_chuck_array
             H_hat = np.fft.fft(H_p_in_time, axis=-2)
-
-            # H_hat_in_time = np.fft.ifft2(H_hat)
-            # H_hat_in_time = H_hat_in_time * self.chuck_array
-            # H_hat = np.fft.fft2(H_hat_in_time)
 
         H_hat = torch.from_numpy(H_hat)
         H_hat = H_hat.permute(0, 2, 3, 1)
@@ -166,10 +160,20 @@ class InterpolationMethodChuck(InterpolationMethodLine):
 
 class InterpolationMethodDct(InterpolationMethodLine):
 
-    def __init__(self, n_sc, pilot_count: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
+    def __init__(self, n_sc, n_f: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
                  extra=''):
-        super().__init__(n_sc, pilot_count, denoisingMethod, False, extra=extra)
+        super().__init__(n_sc, n_f, 'linear', denoisingMethod, False, extra=extra)
         self.path_chuck_array = path_chuck_array
+        self.compensate_before = np.zeros((self.pilot_count,), dtype=np.complex128)
+        self.compensate_before[0] = 1/np.sqrt(2)
+        for k in range(1, self.pilot_count):
+            self.compensate_before[k] = np.e**(-1j*np.pi*k/(2*self.pilot_count))
+        self.compensate_after = np.zeros((self.n_sc,), dtype=np.complex128)
+        self.compensate_after[0] = np.sqrt(2 * self.n_sc / self.pilot_count)
+        for k in range(1, self.n_sc):
+            self.compensate_after[k] = np.sqrt(self.n_sc / self.pilot_count) * np.e ** (1j * np.pi * k / (2 * self.n_sc))
+        self.compensate_before = self.compensate_before.reshape((-1, 1))
+        self.compensate_after = self.compensate_after.reshape((-1, 1))
 
     def get_key_name(self):
         if self.is_denosing:
@@ -210,26 +214,22 @@ class InterpolationMethodDct(InterpolationMethodLine):
             H_hat = h_p
             H_hat = H_hat.permute(0, 3, 1, 2)
             H_hat = H_hat.numpy()
-            # H_hat_w = H_hat * hamming(self.n_sc*2)[:self.n_sc].reshape((-1, 1))
-            # H_hat_in_time = np.fft.ifft(H_hat, axis=-2)
-            # H_hat_in_time = H_hat_in_time * self.path_chuck_array
-            # H_hat = np.fft.fft(H_hat_in_time, axis=-2)
             H_hat_in_time = sp.idct(H_hat, axis=-2, norm='ortho')
             H_hat_in_time = H_hat_in_time * self.path_chuck_array
             H_hat = sp.dct(H_hat_in_time, axis=-2, norm='ortho')
         else:
             h_p = h_p.permute(0, 3, 1, 2)
             h_p = h_p.numpy()
-            h_p = h_p * np.hamming(self.pilot_count).reshape((-1, 1))
-            h_p_in_time = np.fft.ifft(h_p, axis=-2)
-            split_idx = self.pilot_count // 2
+            h_p = h_p * self.compensate_before
+            h_p_in_time = sp.idct(h_p, axis=-2, norm='ortho')
+            split_idx = self.pilot_count
             zeros_count = self.n_sc - self.pilot_count
             H_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
                                           np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
                                           h_p_in_time[:, :, split_idx:]), axis=-2)
-            H_hat = np.fft.fft(H_p_in_time, axis=-2)
-            H_hat = H_hat * np.hamming(self.n_sc).reshape((-1, 1))
-
+            H_p_in_time = H_p_in_time * self.path_chuck_array
+            H_hat = sp.dct(H_p_in_time, axis=-2, norm='ortho')
+            H_hat = H_hat * self.compensate_after
             # H_hat_in_time = np.fft.ifft2(H_hat)
             # H_hat_in_time = H_hat_in_time * self.chuck_array
             # H_hat = np.fft.fft2(H_hat_in_time)
@@ -241,11 +241,11 @@ class InterpolationMethodDct(InterpolationMethodLine):
 
 class InterpolationMethodModel(InterpolationMethodLine):
 
-    def __init__(self, model: CBDNetSFModel, use_gpu, pilot_count=None, extra='') -> None:
+    def __init__(self, model: CBDNetSFModel, use_gpu, n_f=None, extra='') -> None:
         denoisingMethod = DenoisingMethodLS()
-        if pilot_count is None:
-            pilot_count = model.pilot_count
-        super().__init__(model.n_sc, pilot_count, denoisingMethod, False, extra)
+        if n_f is None:
+            n_f = model.pilot_count
+        super().__init__(model.n_sc, n_f, 'linear', denoisingMethod, False, extra)
         self.model = model.double().eval()
         self.use_gpu = use_gpu
         if self.use_gpu:
@@ -263,7 +263,7 @@ class InterpolationMethodModel(InterpolationMethodLine):
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
             h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
-        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+        H_hat = line_interpolation_hp_pilot_sp(h_p, self.pilot_idx, self.n_sc)
         H_hat = H_hat.permute(0, 3, 1, 2)
         H_hat = complex2real(H_hat.reshape((-1,) + H_hat.shape[-2:]))
         var = var.repeat((1, 1, 1, n_t)).reshape(-1, 1)
@@ -293,7 +293,7 @@ class InterpolationMethodModel(InterpolationMethodLine):
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
             h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
-        H_hat = line_interpolation_hp_pilot(h_p, self.pilot_idx, self.n_sc)
+        H_hat = line_interpolation_hp_pilot_sp(h_p, self.pilot_idx, self.n_sc)
         H_hat = H_hat.permute(0, 3, 1, 2)
         H_hat = complex2real(H_hat.reshape((-1,) + H_hat.shape[-2:]))
         var = var.repeat((1, 1, 1, n_t)).reshape(-1, 1)
