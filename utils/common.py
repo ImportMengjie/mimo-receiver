@@ -112,7 +112,7 @@ def print_parameter_number(net):
 class TestMethod(Enum):
     one_row = 1
     whole_noise = 2
-    dft_diff = 3
+    freq_diff = 3
 
 
 if __name__ == '__main__':

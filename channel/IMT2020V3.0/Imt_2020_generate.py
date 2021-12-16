@@ -30,6 +30,15 @@ def get_freq_G(N_sc, H: np.ndarray, fs, delay, path_count):
 
 
 def imt_2020_generate(step=2):
+    max_delay = 0
+
+    def get_max_delay(*args):
+        max_delay = 0
+        for delay in args:
+            if len(delay.flatten()):
+                max_delay = max(delay.max(), max_delay)
+        return max_delay
+
     H = None
     sim = 1
     path_count = []
@@ -44,6 +53,8 @@ def imt_2020_generate(step=2):
     sf_sigmas = pathloss.get('SF_sigma').squeeze()
     pathloss = pathloss.get('Pathloss').squeeze()
     sc_band = base_conf.get('sc_band').item()
+
+    bound_delay = N_sc/(6*bw)
     while os.path.exists('H/H_sim{}_data.mat'.format(sim)):
         logging.info('start H/H_sim{}_data.mat'.format(sim))
         h_data = scio.loadmat('H/H_sim{}_data.mat'.format(sim))
@@ -52,6 +63,7 @@ def imt_2020_generate(step=2):
         los_delay = ssp_data.get('LOS')['Delay'][0, 0].swapaxes(0, 1)
         nlos_delay = ssp_data.get('NLOS')['Delay'][0, 0].swapaxes(0, 1)
         o2i_delay = ssp_data.get('O2I')['Delay'][0, 0].swapaxes(0, 1)
+        max_delay = max(get_max_delay(los_delay, nlos_delay, o2i_delay), max_delay)
 
         h_los = un_squeeze(h_data.get('H_u_s_n_LOS'))
         h_nlos = un_squeeze(h_data.get('H_u_s_n_NLOS'))
@@ -95,14 +107,15 @@ def imt_2020_generate(step=2):
     H_r = H.real.reshape(H.shape + (1,))
     H_i = H.imag.reshape(H.shape + (1,))
     H = np.concatenate((H_r, H_i), -1)
-    return H, path_count, H.shape[0], N_r, N_t, N_sc
+    return H, path_count, H.shape[0], N_r, N_t, N_sc, max_delay
 
 
 if __name__ == '__main__':
     import sys
+
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    H, path_count, J, N_r, N_t, N_sc = imt_2020_generate(2)
+    H, path_count, J, N_r, N_t, N_sc, max_delay = imt_2020_generate(2)
     if H is not None:
         filename = 'imt_2020_{}_{}_{}_{}.mat'.format(N_r, N_t, N_sc, J)
         path_count = np.array(path_count)

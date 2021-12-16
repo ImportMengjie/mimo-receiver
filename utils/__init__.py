@@ -30,5 +30,5 @@ from utils.model import Padding, ConvReluBlock, ConvBnReluBlock
 
 from utils.DftChuckTestMethod import DftChuckTestMethod, DftChuckMethod
 from utils.DftChuckTestMethod import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod
-from utils.DftChuckTestMethod import ModelPathestMethod, DftChuckThresholdMethod
+from utils.DftChuckTestMethod import ModelPathestMethod, DftChuckThresholdMethod, DftChuckThresholdVarMethod, DftChuckThresholdMeanMethod
 from utils.DftChuckTestMethod import Transform

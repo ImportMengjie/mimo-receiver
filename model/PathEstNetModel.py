@@ -95,7 +95,7 @@ class PathEstCnn(PathEstBaseModel):
     def __init__(self, csiDataloader: CsiDataloader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
                  dnn_list=(2000, 200, 50),
                  extra=''):
-        super().__init__(csiDataloader, TestMethod.dft_diff)
+        super().__init__(csiDataloader, TestMethod.freq_diff)
         self.dnn_list = dnn_list
         self.add_var = add_var
         self.use_true_var = use_true_var

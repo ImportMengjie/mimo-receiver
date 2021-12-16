@@ -51,9 +51,9 @@ def analysis_window(csi_dataloader: CsiDataloader):
                     draw_dict[name_list[i]] = draw_dict[name_list[i]] ** 2
             else:
                 pass
-        ylabel = 'mold' if mold else 'power'
+        ylabel = 'Amplitude' if mold else 'power'
         draw_line(x=list(range(0, h_list[0].shape[0])), y_dict=draw_dict, xlabel='K', ylabel=ylabel,
-                  title='path count{}'.format(path_count))
+                  title='')
 
     H = csi_dataloader.get_h(DataType.test)
 
@@ -63,28 +63,28 @@ def analysis_window(csi_dataloader: CsiDataloader):
     ifft_h = np.fft.ifft(H, axis=-2)
     idct_h = sp.idct(H, axis=-2, norm='ortho')
     j = 0
-    m = 20
+    m = 11
     n_r = 0
-    # draw_one_h([ifft_h[j, m], idct_h[j, m]], ['ifft', 'idct'], n_r=n_r,
-    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
-    # draw_one_h([ifft_h[j, m]], ['ifft', ], n_r=n_r,
-    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
-    # draw_one_h([idct_h[j, m]], ['idct'], n_r=n_r,
-    #            path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    draw_one_h([ifft_h[j, m], idct_h[j, m]], ['ifft', 'idct'], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    draw_one_h([ifft_h[j, m]], ['ifft', ], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
+    draw_one_h([idct_h[j, m]], ['idct'], n_r=n_r,
+               path_count=csi_dataloader.get_path_count(DataType.test, j, m))
 
-    padding_h = []
-    padding_name = []
-    # padding
-    for n_f in range(1, 4):
-        idx = get_interpolation_idx_nf(K, n_f).numpy()
-        H_p = H[j, m, idx]
-        H_p_idft = np.fft.ifft(H_p, axis=0)
-        H_p_idft = np.concatenate((H_p_idft, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
-        H_p_idct = sp.idct(H_p, axis=0, norm='ortho')
-        H_p_idct = np.concatenate((H_p_idct, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
-        padding_h.extend([H_p_idft, H_p_idct])
-        padding_name.extend(['idft-{}'.format(n_f), 'idct-{}'.format(n_f)])
-    draw_one_h(padding_h, name_list=padding_name, n_r=n_r)
+    # padding_h = []
+    # padding_name = []
+    # # padding
+    # for n_f in range(1, 4):
+    #     idx = get_interpolation_idx_nf(K, n_f).numpy()
+    #     H_p = H[j, m, idx]
+    #     H_p_idft = np.fft.ifft(H_p, axis=0)
+    #     H_p_idft = np.concatenate((H_p_idft, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
+    #     H_p_idct = sp.idct(H_p, axis=0, norm='ortho')
+    #     H_p_idct = np.concatenate((H_p_idct, np.zeros((K - H_p.shape[0], H_p.shape[1]))), axis=0)
+    #     padding_h.extend([H_p_idft, H_p_idct])
+    #     padding_name.extend(['idft-{}'.format(n_f), 'idct-{}'.format(n_f)])
+    # draw_one_h(padding_h, name_list=padding_name, n_r=n_r)
 
 
 def analysis_interpolation_pilot_data(csi_dataloader: CsiDataloader,
@@ -432,7 +432,7 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9)
+    csi_dataloader = CsiDataloader('data/imt_2020_64_32_512_100_lsp.mat', train_data_radio=0.9)
     # analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
     #                          model_pilot_count=63, noise_level_conv=4, noise_channel=32,
     #                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),

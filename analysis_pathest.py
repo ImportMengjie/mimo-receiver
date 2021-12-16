@@ -7,7 +7,7 @@ from train import load_model_from_file
 from utils import DenoisingMethodLS
 from utils import VarTestMethod, SWTestMethod, KSTestMethod, ADTestMethod, NormalTestMethod, ModelPathestMethod
 from utils import draw_line
-from utils.DftChuckTestMethod import TestMethod, Transform, DftChuckThresholdMethod
+from utils.DftChuckTestMethod import TestMethod, Transform, DftChuckThresholdMeanMethod, DftChuckThresholdVarMethod
 import config.config as config
 import scipy.fftpack as sp
 
@@ -18,32 +18,32 @@ config.USE_GPU = use_gpu
 cmp_var_diff_method = lambda n_r, cp, n_sc: [
     VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
     # VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
-    VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+    VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.freq_diff)]
 
 # test sw-test diff method
 cmp_sw_diff_method = lambda n_r, cp, n_sc: [
     SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
     # SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
-    SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+    SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.freq_diff)]
 
 # test ks-test diff method
 cmp_ks_diff_method = lambda n_r, cp, n_sc: [
     # KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=True),
     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row, two_samp=False),
     # KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
-    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+    KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.freq_diff)]
 
 # test ad-test diff method
 cmp_ad_diff_method = lambda n_r, cp, n_sc: [
     ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
     # ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
-    ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+    ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.freq_diff)]
 
 # test normal-test diff method
 cmp_normal_diff_method = lambda n_r, cp, n_sc: [
     NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row),
     # NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.whole_noise),
-    NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff)]
+    NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.freq_diff)]
 
 
 def flatten_complex(a):
@@ -354,10 +354,10 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    cp = 64
+    cp = 128
     min_path = 1
     data_path = 'data/imt_2020_64_32_512_100.mat'
-    csi_loader = CsiDataloader(data_path, train_data_radio=0.1)
+    csi_loader = CsiDataloader(data_path, train_data_radio=0.2)
     n_r = csi_loader.n_r
     n_sc = csi_loader.n_sc
 
@@ -377,36 +377,51 @@ if __name__ == '__main__':
     # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_cnn))
 
     # threshold
+    # dft_chuck_test_list.append(
+    #     DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
     dft_chuck_test_list.append(
-        DftChuckThresholdMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
-    dft_chuck_test_list.append(
-        DftChuckThresholdMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dct))
+        DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dct))
+    # dft_chuck_test_list.append(
+    #     DftChuckThresholdVarMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
+    # dft_chuck_test_list.append(
+    #     DftChuckThresholdVarMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dct))
 
     # var-test
     # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
     # dft_chuck_test_list.append(VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
     # dft_chuck_test_list.append(
     #     VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.one_row))
-    dft_chuck_test_list.append(
-        VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(
+    #     VarTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.dft_diff))
 
     # ks-test
-    # dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
-    # dft_chuck_test_list.append(KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(
+    #     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.one_row))
+    dft_chuck_test_list.append(
+        KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.freq_diff))
+
+    # dft_chuck_test_list.append(
+    #     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dft, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(
+    #     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dft, testMethod=TestMethod.dft_diff))
 
     # ad-test
     # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
     # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
 
     # sw-test
-    # dft_chuck_test_list.append(SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
-    # dft_chuck_test_list.append(SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
+    # dft_chuck_test_list.append(
+    #     SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(
+    #     SWTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.dft_diff))
 
     # norm-test
-    # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))
-    # dft_chuck_test_list.append(NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.dft_diff))
-
-    cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=15,
+    # dft_chuck_test_list.append(
+    #     NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.one_row))
+    # dft_chuck_test_list.append(
+    #     NormalTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dct, testMethod=TestMethod.dft_diff))
+    #
+    cmp_diff_test_method_nmse(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=18,
                               snr_step=2)
     # cmp_diff_test_method(csi_loader=csi_loader, dft_chuck_test_list=dft_chuck_test_list, snr_start=0, snr_end=5,
     #                      snr_step=1,)

@@ -28,7 +28,8 @@ def redraw(json_path: str):
     path, _ = os.path.splitext(json_path)
     img_path = path + '.png'
     draw_line(x=data_json['x'], y_dict=data_json['y_dict'], title=data_json['title'], save_path=img_path,
-              xlabel=data_json['xlabel'], ylabel=data_json['ylabel'])
+              xlabel=data_json['xlabel'], ylabel=data_json['ylabel'], diff_line_style=data_json['style'],
+              diff_line_markers=data_json['markers'])
 
 
 if __name__ == '__main__':
