@@ -5,6 +5,7 @@ import os
 import json
 
 plt.rcParams['axes.unicode_minus'] = False
+plt.rcParams['font.sans-serif'] = 'Times New Roman'
 
 line_style_list = ['-', '--', '-.', ':'][::-1]
 
