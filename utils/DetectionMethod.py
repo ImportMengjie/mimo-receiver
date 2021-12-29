@@ -1,5 +1,6 @@
 import abc
 import torch
+import numpy as np
 import torch.nn.functional as F
 
 from loader import CsiDataloader
@@ -61,7 +62,7 @@ class DetectionMethodMMSE(DetectionMethod):
         super().__init__(modulation)
 
     def get_key_name(self):
-        return 'mmse'
+        return 'MMSE'
 
     def get_x_hat(self, y, h, x, var):
         A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
@@ -105,6 +106,104 @@ class DetectionMethodML(DetectionMethod):
         pass
 
 
+class DetectionMethodSD(DetectionMethod):
+
+    def sphereDecoding(m, n, H, variance, QAM=4):
+        INF = 1000111000111
+        alpha = 2
+        v = np.random.normal(0, np.sqrt(variance), (n, 1))
+
+        s = 2 * np.random.random_integers(1, QAM, (m, 1)) - (QAM + 1)
+        x = np.dot(H, s) + v
+
+        d = alpha * variance * n
+        print("Algorithm est for radius = ", np.sqrt(d))
+        babaiB = np.floor(np.dot(np.linalg.pinv(H), x))
+        babaiD = np.linalg.norm(x - np.dot(H, babaiB))
+        print("Babai est for radius =", babaiD)
+        print(QAM)
+        print(s)
+        res = np.linalg.qr(H)
+        R = res[1]
+        q1 = res[0]
+
+        y = np.dot(q1.conj().T, x)
+        _y = y.copy()
+
+        D = np.zeros(m)
+        UB = np.zeros(m)
+        k = m - 1
+        D[k] = np.sqrt(d)
+        setUB = 1
+        flopsCount = 0
+        ans = INF
+        answer = np.zeros(m)
+
+        ###Start
+        for _ in range(1, 10):
+            k = m - 1
+            _y = y.copy()
+            D = np.zeros(m)
+            UB = np.zeros(m)
+            D[k] = np.sqrt(d)
+            setUB = 1
+            while True:
+                flopsCount += 1
+                if setUB == 1:
+                    if (D[k] + _y[k]) / R[k][k] > (-D[k] + _y[k]) / R[k][k]:
+
+                        UB[k] = np.floor((D[k] + _y[k]) / R[k][k])
+                        s[k] = np.ceil((-D[k] + _y[k]) / R[k][k]) - 1
+                    else:
+                        UB[k] = np.floor((-D[k] + _y[k]) / R[k][k])
+                        s[k] = np.ceil((D[k] + _y[k]) / R[k][k]) - 1
+                    te = s[k] + 1
+                    for j in range(QAM - 1, -QAM, -2):
+                        if te > j:
+                            break
+                        s[k] = j - 2
+                s[k] = s[k] + 2
+                # print(k,s[k],UB[k])
+                setUB = 0
+                if s[k] <= UB[k] and s[k] < QAM:
+                    if k == 0:
+                        if ans > np.linalg.norm(np.dot(H, s) - x):
+                            ans = np.linalg.norm(np.dot(H, s) - x)
+                            answer = s.copy()
+                            print("***", answer)
+                        # print(s,np.linalg.norm(np.dot(H,s.T)-x.T) )
+                    else:
+                        k = k - 1
+                        _y[k] = y[k]
+                        for i in range(k + 1, m):
+                            # flopsCount += 1
+                            _y[k] -= (R[k][i] * s[i])
+
+                        D[k] = np.sqrt(D[k + 1] ** 2 - (_y[k + 1] - R[k + 1][k + 1] * s[k + 1]) ** 2)
+                        setUB = 1
+                    continue
+                else:
+                    k = k + 1
+                    if k == m:
+                        break
+
+            if ans == INF:
+                print("The Radius is not big enough")
+                d *= alpha
+                print(np.sqrt(d))
+            else:
+                break
+
+        flopsCount *= 14
+        return answer
+
+    def get_key_name(self):
+        return 'SD'
+
+    def get_x_hat(self, y, h, x, var):
+        pass
+
+
 class DetectionMethodConjugateGradient(DetectionMethod):
 
     def __init__(self, modulation, iterate, name_add_iterate=True):
@@ -114,12 +213,12 @@ class DetectionMethodConjugateGradient(DetectionMethod):
 
     def get_key_name(self):
         if self.name_add_iterate:
-            return 'cg-{}th'.format(self.iterate)
+            return 'CG-{}th'.format(self.iterate)
         else:
             return self.get_key_name_short()
 
     def get_key_name_short(self):
-        return 'cg'
+        return 'CG'
 
     @staticmethod
     def conjugate(s, r, d, A):

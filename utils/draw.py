@@ -54,7 +54,7 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save
 
         data_json = {
             'title': title,
-            'x': x,
+            'x': list(x),
             'y_dict': y_dict,
             'xlabel': xlabel,
             'ylabel': ylabel,
