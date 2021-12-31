@@ -1,4 +1,6 @@
 import abc
+import time
+
 import torch
 import numpy as np
 import torch.nn.functional as F
@@ -66,7 +68,16 @@ class DetectionMethodMMSE(DetectionMethod):
 
     def get_x_hat(self, y, h, x, var):
         A = h.conj().transpose(-1, -2) @ h + var * torch.eye(h.shape[-1], h.shape[-1])
-        x_hat = torch.inverse(A) @ h.conj().transpose(-1, -2) @ y
+        b = h.conj().transpose(-1, -2) @ y
+
+        b = torch.cat((b.real, b.imag), 2)
+        A_left = torch.cat((A.real, A.imag), 2)
+        A_right = torch.cat((-A.imag, A.real), 2)
+        A = torch.cat((A_left, A_right), 3)
+        x_hat = torch.inverse(A) @ b
+
+        x_hat = x_hat[:, :, 0:x.shape[-2], :] + x_hat[:, :, x.shape[-2]:, :] * 1j
+        time.sleep(0.15)
         return x_hat
 
 

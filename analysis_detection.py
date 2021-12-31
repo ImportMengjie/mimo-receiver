@@ -173,15 +173,68 @@ def cmp_diff_layers_nmse_not_train(csi_dataloader: CsiDataloader, fix_snr, layer
               save_dir=config.DETECTION_RESULT_IMG, diff_line_markers=True)
 
 
+def cmp_model_runtime(data_path, modulation, layer, use_layer, x_count, step,
+                      show_name_v, show_name_s, extra=''):
+    import time
+    import os
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    os.environ["OMP_NUM_THREADS"] = "1"
+
+    csi_dataloader = CsiDataloader(data_path, train_data_radio=1)
+    model_v = DetectionNetModel(csi_dataloader, layer_nums=layer, svm='v', is_training=True,
+                                modulation=modulation, extra=extra)
+    model_s = DetectionNetModel(csi_dataloader, layer_nums=layer, svm='s', is_training=True,
+                                modulation=modulation, extra=extra)
+    model_v = load_model_from_file(model_v, use_gpu)
+    model_s = load_model_from_file(model_s, use_gpu)
+    model_v.name = show_name_v
+    model_s.name = show_name_s
+    model_s.set_training_layer(use_layer)
+    model_v.set_training_layer(use_layer)
+    detection_methods = [DetectionMethodConjugateGradient(modulation, use_layer,False), DetectionMethodMMSE(modulation),
+                         DetectionMethodModel(model_v, modulation, use_gpu),
+                         DetectionMethodModel(model_s, modulation, use_gpu)]
+
+    x, _ = csi_dataloader.get_x(dataType=DataType.train, modulation=modulation)
+    h = csi_dataloader.get_h(dataType=DataType.train)
+    hx = h @ x
+    n, var = csi_dataloader.noise_snr_range(hx, [5, 6], one_col=True)
+    y = hx + n
+    y = y.reshape((-1, csi_dataloader.n_r, 1))
+    x = x.reshape((-1, csi_dataloader.n_t, 1))
+    h = h.reshape((-1, csi_dataloader.n_r, csi_dataloader.n_t))
+    var = var[0].reshape((1, 1, 1, 1))
+    draw_dict = {m.get_key_name(): [] for m in detection_methods}
+    x_list = list(range(step, csi_dataloader.J * csi_dataloader.n_sc, step))[:x_count]
+    for i in x_list:
+        _y = y[:i]
+        _x = x[:i]
+        _h = h[:i]
+        _y = _y.reshape((1,) + _y.shape)
+        _x = _x.reshape((1,) + _x.shape)
+        _h = _h.reshape((1,) + _h.shape)
+        for m in detection_methods:
+            start_time = time.perf_counter()
+            m.get_x_hat(_y, _h, _x, var)
+            end_time = time.perf_counter()
+            dur = (end_time - start_time) * 1000
+            draw_dict[m.get_key_name()].append(dur)
+    draw_line(x_list, draw_dict, title='Compare algorithm running time', save_dir=config.DETECTION_RESULT_IMG,
+              xlabel='dataSize', ylabel='use time(ms)', diff_line_markers='true')
+
+
 if __name__ == '__main__':
     import logging
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9, factor=1)
+    # csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9, factor=1)
+    cmp_model_runtime('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', 'bpsk', 32, 15, 10, 1000, 'DL-CG-Vector', 'DL-CG-Scalar',
+                      extra='')
     # cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='qpsk', layer=32, svm='v',
     #                               extra='', show_name='lcg-net')
-    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=0, snr_end=25, snr_step=1, modulation='qpsk',
-                            layer=32, svm='v', extra='', show_name='lcg-net')
+    # cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=0, snr_end=25, snr_step=1, modulation='qpsk',
+    #                         layer=32, svm='v', extra='', show_name='lcg-net')
     # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
     #                      modulation='bpsk', layer=32, svm='v', extra='')
