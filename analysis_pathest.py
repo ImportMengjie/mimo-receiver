@@ -349,6 +349,18 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
               '{}-path-est-h-nmse-cmp'.format(csi_loader), diff_line_markers=True, save_dir=config.PATHEST_RESULT_IMG)
 
 
+def draw_cdf():
+    from scipy.stats import norm
+    x = np.arange(-7, 7, 0.1)
+    draw_dict = {'F_0(x)': [], 'S_n(x)': []}
+    norm_y = np.random.normal(0, 1, 10)
+
+    for x_ in x:
+        draw_dict['F_0(x)'].append(norm.cdf(x_, loc=0, scale=1))
+        draw_dict['S_n(x)'].append((norm_y <= x_).sum() / len(norm_y))
+    draw_line(x, draw_dict, '', xlabel='', ylabel='Cumulative Probability', save_dir=config.PATHEST_RESULT_IMG)
+
+
 if __name__ == '__main__':
     import logging
 
@@ -380,7 +392,8 @@ if __name__ == '__main__':
     # dft_chuck_test_list.append(
     #     DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
     dft_chuck_test_list.append(
-        DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dct))
+        DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False,
+                                    transform=Transform.dct))
     # dft_chuck_test_list.append(
     #     DftChuckThresholdVarMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
     # dft_chuck_test_list.append(

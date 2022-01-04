@@ -53,7 +53,7 @@ def analysis_window(csi_dataloader: CsiDataloader):
                 pass
         ylabel = 'Amplitude' if mold else 'power'
         draw_line(x=list(range(0, h_list[0].shape[0])), y_dict=draw_dict, xlabel='K', ylabel=ylabel,
-                  title='')
+                  title='', save_dir=config.INTERPOLATION_RESULT_IMG)
 
     H = csi_dataloader.get_h(DataType.test)
 
