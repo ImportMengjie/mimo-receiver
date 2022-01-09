@@ -9,7 +9,8 @@ from model import CBDNetSFModel
 from utils import DenoisingMethod
 from utils import complex2real, DenoisingMethodLS
 from utils import get_interpolation_idx_nf
-from utils import line_interpolation_hp_pilot_sp
+from utils.common import line_interpolation_hp_pilot_sp
+from utils.DftChuckTestMethod import DftChuckMethod, Transform, get_chuck_G
 
 
 class InterpolationMethod(abc.ABC):
@@ -97,13 +98,97 @@ class InterpolationMethodLine(InterpolationMethod):
         return H_hat
 
 
+class InterpolationMethodTransformChuck(InterpolationMethodLine):
+
+    def __init__(self, n_sc, n_f: int, transform: Transform, cp=None, path_chuck_array: np.ndarray = None,
+                 denoisingMethod: DenoisingMethod = None, chuckMethod: DftChuckMethod = None, extra=''):
+        super().__init__(n_sc, n_f, 'linear', denoisingMethod, False, extra=extra)
+        assert path_chuck_array is not None or chuckMethod is not None
+        self.path_chuck_array = path_chuck_array
+        self.chuckMethod = chuckMethod
+        self.chuckMethod.n_sc = self.n_sc
+        self.cp = n_sc // 4 if cp is None else cp
+        self.transform = transform
+        self.chuckMethod.transform = transform
+        if transform == Transform.dct:
+            self.compensate_before = np.zeros((self.pilot_count,), dtype=np.complex128)
+            self.compensate_before[0] = 1 / np.sqrt(2)
+            for k in range(1, self.pilot_count):
+                self.compensate_before[k] = np.e ** (-1j * np.pi * k / (2 * self.pilot_count))
+            self.compensate_after = np.zeros((self.n_sc,), dtype=np.complex128)
+            self.compensate_after[0] = np.sqrt(2 * self.n_sc / self.pilot_count)
+            for k in range(1, self.n_sc):
+                self.compensate_after[k] = np.sqrt(self.n_sc / self.pilot_count) * np.e ** (
+                        1j * np.pi * k / (2 * self.n_sc))
+            self.compensate_before = self.compensate_before.reshape((-1, 1))
+            self.compensate_after = self.compensate_after.reshape((-1, 1))
+
+    def get_key_name(self):
+        name = self.transform.name
+        name += '-{}'.format('chuck' if self.is_denosing else 'padding')
+        name += '-{}'.format(self.denoisingMethod.get_key_name())
+        if self.chuckMethod:
+            name += '-{}'.format(self.chuckMethod.name())
+        if self.extra:
+            name += '-{}'.format(self.extra)
+        return name
+
+    def get_pilot_name(self):
+        return self.get_key_name()
+
+    def get_H_hat(self, y, H, xp, var, rhh):
+        h_p = H[:, self.pilot_idx]
+        if self.denoisingMethod is not None:
+            y = y[:, self.pilot_idx]
+            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
+        h_p = h_p.permute(0, 3, 1, 2)
+        h_p = h_p.numpy()
+        if self.is_denosing:
+            self.chuckMethod.n_sc = self.n_sc
+            self.chuckMethod.cp = self.cp
+            h_p_in_time, chuck_array = get_chuck_G(h_p, var, self.chuckMethod)
+            h_p_in_time = h_p_in_time * chuck_array
+            if self.chuckMethod.transform == Transform.dft:
+                H_hat = np.fft.fft(h_p_in_time, axis=-2)
+            else:
+                H_hat = sp.dct(h_p_in_time, axis=-2, norm='ortho')
+        else:
+            self.chuckMethod.n_sc = self.pilot_count
+            self.chuckMethod.cp = self.cp
+            h_p_in_time, chuck_array = get_chuck_G(h_p, var, self.chuckMethod)
+            if self.chuckMethod.transform == Transform.dft:
+                h_p_in_time = h_p_in_time * chuck_array
+                split_idx = self.pilot_count
+                zeros_count = self.n_sc - self.pilot_count
+                H_hat = np.concatenate((h_p_in_time[:, :, :split_idx],
+                                              np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                              h_p_in_time[:, :, split_idx:]), axis=-2)
+
+            else:
+                h_p = h_p*self.compensate_before
+                h_p_in_time = sp.idct(h_p, axis=-2, norm='ortho')
+                h_p_in_time = h_p_in_time*chuck_array
+                split_idx = self.pilot_count
+                zeros_count = self.n_sc - self.pilot_count
+                h_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
+                                        np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                        h_p_in_time[:, :, split_idx:]), axis=-2)
+                H_hat = sp.dct(h_p_in_time, axis=-2, norm='ortho')
+                H_hat = H_hat * self.compensate_after
+        H_hat = torch.from_numpy(H_hat)
+        H_hat = H_hat.permute(0, 2, 3, 1)
+        return H_hat
+
+
 class InterpolationMethodChuck(InterpolationMethodLine):
 
     def __init__(self, n_sc, n_f: int, path_chuck_array: np.ndarray, denoisingMethod: DenoisingMethod = None,
-                 padding_chuck=False, extra=''):
+                 chuckMethod: DftChuckMethod = None, padding_chuck=False, extra=''):
         super().__init__(n_sc, n_f, 'linear', denoisingMethod, False, extra=extra)
         self.padding_chuck = padding_chuck
         self.path_chuck_array = path_chuck_array
+        self.chuckMethod = chuckMethod
+        self.cp = self.n_sc // 4
 
     def get_key_name(self):
         if self.is_denosing:
@@ -165,13 +250,14 @@ class InterpolationMethodDct(InterpolationMethodLine):
         super().__init__(n_sc, n_f, 'linear', denoisingMethod, False, extra=extra)
         self.path_chuck_array = path_chuck_array
         self.compensate_before = np.zeros((self.pilot_count,), dtype=np.complex128)
-        self.compensate_before[0] = 1/np.sqrt(2)
+        self.compensate_before[0] = 1 / np.sqrt(2)
         for k in range(1, self.pilot_count):
-            self.compensate_before[k] = np.e**(-1j*np.pi*k/(2*self.pilot_count))
+            self.compensate_before[k] = np.e ** (-1j * np.pi * k / (2 * self.pilot_count))
         self.compensate_after = np.zeros((self.n_sc,), dtype=np.complex128)
         self.compensate_after[0] = np.sqrt(2 * self.n_sc / self.pilot_count)
         for k in range(1, self.n_sc):
-            self.compensate_after[k] = np.sqrt(self.n_sc / self.pilot_count) * np.e ** (1j * np.pi * k / (2 * self.n_sc))
+            self.compensate_after[k] = np.sqrt(self.n_sc / self.pilot_count) * np.e ** (
+                    1j * np.pi * k / (2 * self.n_sc))
         self.compensate_before = self.compensate_before.reshape((-1, 1))
         self.compensate_after = self.compensate_after.reshape((-1, 1))
 
@@ -196,16 +282,6 @@ class InterpolationMethodDct(InterpolationMethodLine):
             return 'chuck-true'
 
     def get_H_hat(self, y, H, xp, var, rhh):
-        def hanning(M, S=1.1):
-            a = np.arange(-int(M) // 2, int(M) // 2)
-            ans = 0.5 * (1 + np.cos(2 * np.pi * a / (S * M))) * np.e ** (-1j * 4 * np.pi * a / M)
-            return ans
-
-        def hamming(M):
-            m = np.arange(0, M)
-            ans = 0.54 + 0.46 * np.cos(2 * np.pi * m / M)
-            return ans.reshape((-1, 1))
-
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]

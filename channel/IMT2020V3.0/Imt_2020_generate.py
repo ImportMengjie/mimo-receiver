@@ -29,7 +29,7 @@ def get_freq_G(N_sc, H: np.ndarray, fs, delay, path_count):
     return G_m_s
 
 
-def imt_2020_generate(step=2):
+def imt_2020_generate(step=1):
     max_delay = 0
 
     def get_max_delay(*args):

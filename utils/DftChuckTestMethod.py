@@ -28,6 +28,7 @@ class DftChuckMethod(abc.ABC):
         self.cp = cp
         self.min_path = min_path
         self.full_name = full_name
+        self.transform = None
 
     @abc.abstractmethod
     def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
@@ -41,7 +42,7 @@ class DftChuckMethod(abc.ABC):
 class DftChuckThresholdMethod(DftChuckMethod, abc.ABC):
 
     def name(self):
-        return 'threshold-{}-{}'.format(self.get_threshold_name(),self.transform.name)
+        return 'threshold-{}-{}'.format(self.get_threshold_name(), self.transform.name)
 
     def __init__(self, n_r, n_sc, cp, min_path, full_name, transform=Transform.dft):
         super().__init__(n_r, n_sc, cp, min_path, full_name)
@@ -88,9 +89,9 @@ class DftChuckThresholdVarMethod(DftChuckThresholdMethod):
         return 'var'
 
     def get_miu(self, g_hat_time):
-        t1 = (np.abs(g_hat_time[self.cp:])**2).mean()
+        t1 = (np.abs(g_hat_time[self.cp:]) ** 2).mean()
         cp_g_hat_time = np.abs(g_hat_time[:self.cp])
-        t2 = ((cp_g_hat_time**2).sum() - t1*self.cp*self.n_r) / (self.cp*self.n_r)
+        t2 = ((cp_g_hat_time ** 2).sum() - t1 * self.cp * self.n_r) / (self.cp * self.n_r)
         return t1 + t2
 
     def __init__(self, n_r, n_sc, cp, min_path, full_name, transform=Transform.dft):
@@ -363,3 +364,39 @@ class NormalTestMethod(DftChuckTestMethod):
 
     def name(self):
         return 'normal-test-{}-{}'.format(self.testMethod.name, self.transform.name)
+
+
+def get_chuck_G(G: np.ndarray, true_var_complex, chuckMethod: DftChuckMethod):
+    """
+    :param G: shape[J,N_t,K,N_r]
+    :param true_var_complex:
+    :param chuckMethod:
+    :return: G_in_time
+    """
+    J, N_t, K, N_r = G.shape
+    logging.info('get chuck path j={},N_t={},K={},N_r={}, chuckMethod={}'.format(J, N_t, K, N_r, chuckMethod.name()))
+    if chuckMethod.transform == Transform.dft:
+        G_in_time = np.fft.ifft(G, axis=-2)
+    else:
+        G_in_time = sp.idct(G, axis=-2, norm='ortho')
+
+    total_chuck_array = None
+    for j in range(J):
+        chuck_array_n_r = None
+        for n_t in range(N_t):
+            g_in_time = G_in_time[j, n_t]
+            true_var = true_var_complex[j, 0, 0].item() / 2
+            path_hat, _ = chuckMethod.get_path_count(g_in_time, g_in_time, G[j, n_t], true_var)
+
+            chuck_array = np.concatenate((np.ones(path_hat), np.zeros(K - path_hat))).reshape(
+                (1, 1, -1, 1))
+            if chuck_array_n_r is None:
+                chuck_array_n_r = chuck_array
+            else:
+                chuck_array_n_r = np.concatenate((chuck_array_n_r, chuck_array), axis=1)
+        if total_chuck_array is None:
+            total_chuck_array = chuck_array_n_r
+        else:
+            total_chuck_array = np.concatenate((total_chuck_array, chuck_array_n_r), axis=0)
+    logging.info('done chuck path j={},N_t={},K={},N_r={}, chuckMethod={}'.format(J, N_t, K, N_r, chuckMethod.name()))
+    return G_in_time, total_chuck_array

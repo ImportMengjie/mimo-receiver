@@ -93,7 +93,8 @@ def get_interpolation_idx_nf(n_sc: int, n_f: int):
     for i in range(n_sc):
         pilot_idx.append(i % n_f == 0)
     pilot_idx = torch.Tensor(pilot_idx).bool()
-    pilot_idx[-1] = False
+    if n_f != 1:
+        pilot_idx[-1] = False
     return pilot_idx
 
 

@@ -4,8 +4,8 @@ import random
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-from utils import complex2real
-from utils import to_cuda
+from utils.common import complex2real
+from utils.common import to_cuda
 import config.config as config
 
 

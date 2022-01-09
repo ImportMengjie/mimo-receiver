@@ -10,11 +10,13 @@ import config.config as config
 from loader import CsiDataloader, DataType
 from model import CBDNetSFModel
 from train import load_model_from_file
+from utils import Transform
 from utils.DenoisingMethod import DenoisingMethodMMSE, DenoisingMethodIdealMMSE, DenoisingMethodLS
 from utils.InterpolationMethod import InterpolationMethod, InterpolationMethodLine, InterpolationMethodModel, \
-    InterpolationMethodChuck, InterpolationMethodDct
+    InterpolationMethodChuck, InterpolationMethodDct, InterpolationMethodTransformChuck
 from utils.draw import draw_line, draw_point_and_line
 from utils.common import line_interpolation_hp_pilot, complex2real, get_interpolation_idx_nf
+from utils.DftChuckTestMethod import *
 
 use_gpu = True and config.USE_GPU
 config.USE_GPU = use_gpu
@@ -232,6 +234,9 @@ def cmp_model_block(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step,
     interpolation_methods = [
         InterpolationMethodLine(csi_dataloader.n_sc, 0, 'linear', DenoisingMethodLS()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
+        InterpolationMethodTransformChuck(csi_dataloader.n_sc, 0, Transform.dft, denoisingMethod=DenoisingMethodLS(),
+                                          chuckMethod=KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, 0,
+                                                                   testMethod=TestMethod.freq_diff), ),
         InterpolationMethodChuck(csi_dataloader.n_sc, 0, chuck_array, DenoisingMethodLS()),
         InterpolationMethodDct(csi_dataloader.n_sc, 0, chuck_array, DenoisingMethodLS())
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
@@ -263,7 +268,10 @@ def cmp_model_comb(csi_dataloader: CsiDataloader, n_f, snr_start, snr_end, snr_s
         # InterpolationMethodLine(csi_dataloader.n_sc, n_f, 'cubic', DenoisingMethodIdealMMSE()),
         # InterpolationMethodLine(csi_dataloader.n_sc, pilot_count, DenoisingMethodLS(), True),
         InterpolationMethodChuck(csi_dataloader.n_sc, n_f, chuck_array, DenoisingMethodLS()),
-        InterpolationMethodDct(csi_dataloader.n_sc, n_f, chuck_array, DenoisingMethodLS())
+        InterpolationMethodDct(csi_dataloader.n_sc, n_f, chuck_array, DenoisingMethodLS()),
+        InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, Transform.dct, denoisingMethod=DenoisingMethodLS(),
+                                          chuckMethod=KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, 0,
+                                                                   testMethod=TestMethod.freq_diff), ),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodIdealMMSE(), padding_chuck=True),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodMMSE()),
         # InterpolationMethodChuck(csi_dataloader.n_sc, pilot_count, csi_dataloader.get_chuck_array(DataType.test), DenoisingMethodLS()),
@@ -427,31 +435,76 @@ def analysis_noise_level(csi_dataloader: CsiDataloader, pilot_count, snr_list, n
                         save_dir=config.INTERPOLATION_RESULT_IMG)
 
 
+def draw_relu():
+    import matplotlib.pyplot as plt
+    def sigmoid(x):
+        s = 1 / (1 + np.exp(-x))
+        return s
+
+    def tanh(x):
+        s1 = np.exp(x) - np.exp(-x)
+        s2 = np.exp(x) + np.exp(-x)
+        s = s1 / s2
+        return s
+
+    def relu(x):
+        s = np.where(x < 0, 0, x)
+        return s
+
+    def get_list(f, x_start, x_end, x_step=0.01):
+        x = np.arange(x_start, x_end, x_step)
+        ret = []
+        for x_ in x:
+            ret.append(f(x_))
+        return x, np.array(ret)
+
+    x = np.arange(-5, 5, 0.01)
+    draw_dict = {'ReLu': [], 'Sigmoid': [], 'tanh': []}
+    for x_ in x:
+        draw_dict['ReLu'].append(relu(x_))
+        draw_dict['Sigmoid'].append(sigmoid(x_))
+        draw_dict['tanh'].append(tanh(x_))
+    # draw_line(x, draw_dict, '', xlabel='x', ylabel='y',save_dir=config.INTERPOLATION_RESULT_IMG)
+    plt.subplot(1, 3, 1)
+    plt.plot(*get_list(relu, -5, 5))
+    plt.title('ReLu')
+
+    plt.subplot(1, 3, 2)
+    plt.plot(*get_list(sigmoid, -10, 10))
+    plt.title('Sigmoid')
+
+    plt.subplot(1, 3, 3)
+    plt.plot(*get_list(sigmoid, -5, 5))
+    plt.title('tanh')
+    plt.show()
+
+
 if __name__ == '__main__':
     import logging
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
+    draw_relu()
 
-    csi_dataloader = CsiDataloader('data/imt_2020_64_32_512_100_lsp.mat', train_data_radio=0.9)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.98)
     # analysis_h_visualization(csi_dataloader=csi_dataloader, snr=5,
     #                          model_pilot_count=63, noise_level_conv=4, noise_channel=32,
     #                          noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
     #                          use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='',
     #                          dft_chuck=10, use_dft_padding=False)
-    analysis_window(csi_dataloader)
+    # analysis_window(csi_dataloader)
 
     # block
-    # cmp_model_block(csi_dataloader=csi_dataloader, snr_start=0, snr_end=31, snr_step=2, noise_level_conv=4,
+    # cmp_model_block(csi_dataloader=csi_dataloader, snr_start=0, snr_end=16, snr_step=2, noise_level_conv=4,
     #                 noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,
     #                 kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True, only_return_noise_level=False,
     #                 extra='l10', show_name='CBD-SF', dft_chuck=10)
 
     # comb
-    # cmp_model_comb(csi_dataloader=csi_dataloader, n_f=1, snr_start=0, snr_end=31, snr_step=2,
-    #                model_pilot_count=31, noise_level_conv=4, noise_channel=32,
-    #                noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
-    #                use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
-    #                show_name='CBD-SF', dft_chuck=10)
+    cmp_model_comb(csi_dataloader=csi_dataloader, n_f=1, snr_start=0, snr_end=13, snr_step=2,
+                   model_pilot_count=31, noise_level_conv=4, noise_channel=32,
+                   noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
+                   use_two_dim=True, use_true_sigma=True, only_return_noise_level=False, extra='l10',
+                   show_name='CBD-SF', dft_chuck=10)
 
     # analysis_noise_level(csi_dataloader=csi_dataloader, pilot_count=63, snr_list=[15, 20, 25], noise_level_conv=3,
     #                      noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64,

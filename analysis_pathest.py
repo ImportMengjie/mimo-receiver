@@ -373,24 +373,24 @@ if __name__ == '__main__':
     n_r = csi_loader.n_r
     n_sc = csi_loader.n_sc
 
-    model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
-                           dnn_list=[256, 256, 128, 128, 64, 32],
-                           extra='')
-    model_dnn = load_model_from_file(model_dnn, use_gpu)
-    model_dnn.name = 'dnn'
-
-    model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
-                           dnn_list=[2000, 200, 20], extra='')
-    model_cnn = load_model_from_file(model_cnn, use_gpu)
-    model_cnn.name = 'cnn'
+    # model_dnn = PathEstDnn(csiDataloader=csi_loader, add_var=True, use_true_var=False,
+    #                        dnn_list=[256, 256, 128, 128, 64, 32],
+    #                        extra='')
+    # model_dnn = load_model_from_file(model_dnn, use_gpu)
+    # model_dnn.name = 'dnn'
+    #
+    # model_cnn = PathEstCnn(csiDataloader=csi_loader, add_var=True, use_true_var=False, cnn_count=4, cnn_channel=32,
+    #                        dnn_list=[2000, 200, 20], extra='')
+    # model_cnn = load_model_from_file(model_cnn, use_gpu)
+    # model_cnn.name = 'cnn'
 
     dft_chuck_test_list = []
     # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_dnn))
     # dft_chuck_test_list.append(ModelPathestMethod(n_r=n_r, cp=cp, n_sc=n_sc, model=model_cnn))
 
     # threshold
-    # dft_chuck_test_list.append(
-    #     DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
+    dft_chuck_test_list.append(
+        DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False, transform=Transform.dft))
     dft_chuck_test_list.append(
         DftChuckThresholdMeanMethod(n_r=n_r, n_sc=n_sc, cp=cp, min_path=min_path, full_name=False,
                                     transform=Transform.dct))
@@ -415,8 +415,8 @@ if __name__ == '__main__':
 
     # dft_chuck_test_list.append(
     #     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dft, testMethod=TestMethod.one_row))
-    # dft_chuck_test_list.append(
-    #     KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dft, testMethod=TestMethod.dft_diff))
+    dft_chuck_test_list.append(
+        KSTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, transform=Transform.dft, testMethod=TestMethod.freq_diff))
 
     # ad-test
     # dft_chuck_test_list.append(ADTestMethod(n_r=n_r, cp=cp, n_sc=n_sc, testMethod=TestMethod.one_row))

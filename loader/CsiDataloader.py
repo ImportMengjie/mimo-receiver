@@ -132,7 +132,7 @@ class CsiDataloader:
 
     def _get_path_count(self, j: int, m: int):
         # return int(self.path_count[j * self.n_t + m].item())
-        return 100
+        return 64
 
     def get_path_count(self, dataType: DataType, j, m):
         if dataType == DataType.train:

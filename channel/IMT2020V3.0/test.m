@@ -6,10 +6,10 @@
 clc;  
 clear ;
 
-N_r = 128
+N_r = 64
 N_t = 32
 N_sc = 512
-J = 200
+J = 300
 sim = 1
 sce = 'UMa_A'
 
