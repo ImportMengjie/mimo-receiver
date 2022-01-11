@@ -1,30 +1,39 @@
-import torch
-import random
+import logging
 
+import torch
+
+import config.config as config
 from loader import BaseDataset
 from loader import CsiDataloader
 from loader import DataType
-from utils import complex2real
-from utils import get_interpolation_pilot_idx
-from utils import line_interpolation_hp_pilot
+from utils import complex2real, InterpolationMethodTransformChuck
+from utils import get_interpolation_idx_nf
 from utils import to_cuda
-import config.config as config
 
 
 class InterpolationNetDataset(BaseDataset):
 
-    def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list, pilot_count: int, ) -> None:
+    def __init__(self, csiDataloader: CsiDataloader, dataType: DataType, snr_range: list,
+                 chuckMethod: InterpolationMethodTransformChuck, n_f: int = 0, ) -> None:
         super().__init__(csiDataloader, dataType, snr_range)
-        self.pilot_count = pilot_count
-        self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
+        self.n_f = n_f
+        self.pilot_idx = get_interpolation_idx_nf(csiDataloader.n_sc, n_f)
         self.pilot_count = torch.sum(self.pilot_idx)
+        self.snr_range = snr_range
+        self.chuckMethod = chuckMethod
 
         self.xp = csiDataloader.get_pilot_x()
-        self.h_p = self.h[:, self.pilot_idx, :, :]
-        hx = self.h @ self.xp
-        self.var = csiDataloader.get_var_from_snr(hx, snr_range)
-        self.hx = self.h_p @ self.xp
-        self.xp_inv = torch.inverse(self.xp)
+        self.hx = self.h @ self.xp
+        self.reload()
+
+    def reload(self):
+        logging.info('InterpolationNetDataset:reload gen data')
+        n, var = self.csiDataloader.noise_snr_range(self.hx, self.snr_range, one_col=False)
+        y = self.hx + n
+        H_hat, est_left_var_list = self.chuckMethod.get_H_hat_and_var(y, self.h, self.xp, var, self.csiDataloader.rhh)
+        self.G_hat = H_hat.permute(0, 3, 1, 2)
+        self.est_left_var_list = est_left_var_list
+        logging.info('InterpolationNetDataset:reload done')
 
     def cuda(self):
         pass
@@ -35,24 +44,16 @@ class InterpolationNetDataset(BaseDataset):
     def __getitem__(self, index):
         n_j = index // self.csiDataloader.n_t
         n_t_user = index % self.csiDataloader.n_t
-        var = self.var[random.randint(0, self.var.shape[0] - 1), 0, 0, 0]
-
-        H = self.h[n_j]
-        y = self.hx[n_j] + self.csiDataloader.get_noise_from_half_sigma((var / 2) ** 0.5, count=self.pilot_count)
-        h_pilot_ls = y @ self.xp_inv
-        H_interpolation = line_interpolation_hp_pilot(h_pilot_ls.reshape((1,) + h_pilot_ls.shape), self.pilot_idx,
-                                                      self.csiDataloader.n_sc, True)
-        H_interpolation.squeeze_()
-        H = complex2real(H[:, :, n_t_user])
-        H_interpolation = complex2real(H_interpolation[:, :, n_t_user])
+        g = self.h[n_j, :, :, n_t_user]
+        g = complex2real(g)
+        g_hat = self.G_hat[n_j, n_t_user]
+        g_hat = complex2real(g_hat)
+        est_left_var = self.est_left_var_list[n_j, n_t_user, 0, 0]
         if config.USE_GPU:
-            H = to_cuda(H)
-            H_interpolation = to_cuda(H_interpolation)
-            var = to_cuda(var)
-        return H_interpolation, H, var.reshape(-1)
-
-    def reload(self):
-        pass
+            g_hat = to_cuda(g_hat)
+            g = to_cuda(g)
+            est_left_var = to_cuda(est_left_var)
+        return g_hat, g, est_left_var
 
 
 if __name__ == '__main__':

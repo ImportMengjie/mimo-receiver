@@ -1,4 +1,8 @@
+from loader import InterpolationNetDataset
+from model import CBDNetSFModel, InterpolationNetLoss, InterpolationNetTee
 from train import *
+from utils import InterpolationMethodTransformChuck, Transform
+from utils.InterpolationMethod import get_transformChuckMethod_fix_path
 
 
 def loss_nmse_func(train: Train):
@@ -22,26 +26,18 @@ def loss_nmse_func(train: Train):
     return 0
 
 
-def train_interpolation_net(data_path: str, snr_range: list, pilot_count, noise_level_conv=4, noise_channel=32,
-                            noise_dnn=(2000, 200, 50), denoising_conv=6, denoising_channel=64, kernel_size=(3, 3),
-                            use_two_dim=True, use_true_sigma=False, only_train_noise_level=False, fix_noise=False,
-                            extra='', dft_chuck=0, use_dft_padding=False, save_loss_nmse_data=False):
-    assert not (only_train_noise_level and use_true_sigma)
-    assert not (only_train_noise_level and fix_noise)
-    csi_dataloader = CsiDataloader(data_path, train_data_radio=0.9)
-    dataset = InterpolationNetDataset(csi_dataloader, DataType.train, snr_range, pilot_count)
-    test_dataset = InterpolationNetDataset(csi_dataloader, DataType.test, snr_range, pilot_count)
+def train_interpolation_net(csi_dataloader:CsiDataloader, snr_range: list, chuckMethod: InterpolationMethodTransformChuck, add_var,
+                            n_f=0, conv=6, channel=64, kernel_size=(3, 3), extra=''):
+    dataset = InterpolationNetDataset(csi_dataloader, DataType.train, snr_range, chuckMethod)
+    test_dataset = InterpolationNetDataset(csi_dataloader, DataType.test, snr_range, chuckMethod)
 
     loss_nmse_func_ = None
-    if save_loss_nmse_data:
-        loss_nmse_func_ = loss_nmse_func
+    # if save_loss_nmse_data:
+    #     loss_nmse_func_ = loss_nmse_func
 
-    model = CBDNetSFModel(csi_dataloader, pilot_count, noise_level_conv=noise_level_conv, noise_channel=noise_channel,
-                          noise_dnn=noise_dnn, denoising_conv=denoising_conv, denoising_channel=denoising_channel,
-                          kernel_size=kernel_size, use_two_dim=use_two_dim, use_true_sigma=use_true_sigma,
-                          only_return_noise_level=only_train_noise_level, extra=extra, dft_chuck=dft_chuck,
-                          use_dft_padding=use_dft_padding)
-    criterion = InterpolationNetLoss(only_train_noise_level=only_train_noise_level, use2dim=use_two_dim)
+    model = CBDNetSFModel(csiDataloader=csi_dataloader, chuck_name=chuckMethod.get_key_name(), add_var=add_var, n_f=n_f,
+                          conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+    criterion = InterpolationNetLoss()
     param = TrainParam()
     param.stop_when_test_loss_down_epoch_count = 5
     param.epochs = 50
@@ -56,28 +52,37 @@ def train_interpolation_net(data_path: str, snr_range: list, pilot_count, noise_
 if __name__ == '__main__':
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
+    # spatial mu ula
     # block
-    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_400_l10_11.mat', snr_range=[5, 25], pilot_count=63,
-                            noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
-                            denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
-                            only_train_noise_level=False, fix_noise=True, extra='', dft_chuck=10,
-                            use_dft_padding=False, save_loss_nmse_data=True)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.9)
+    cp = 16
+    chuckMethod10_nf0 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=10, n_f=0, cp=cp)
+    chuckMethod10_nf1 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=10, n_f=1, cp=cp)
+    chuckMethod10_nf2 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=10, n_f=2, cp=cp)
+    chuckMethod10_nf3 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=10, n_f=3, cp=cp)
+    chuckMethod_cp_nf0 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=cp, n_f=0, cp=cp)
+    chuckMethod_None_nf0 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dft, fix_path=csi_dataloader.n_sc, n_f=0, cp=cp)
+
+    # base
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod10_nf0, add_var=True, n_f=0, conv=6, channel=64, extra='')
+    # without var
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod10_nf0, add_var=False, n_f=0, conv=6, channel=64, extra='')
+    # without dft chuck
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod_None_nf0, add_var=True, n_f=0, conv=6, channel=64, extra='')
+    # cp chuck
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod_cp_nf0, add_var=True, n_f=0, conv=6, channel=64, extra='')
+
     # comb nf=1
-    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_400_l10_11.mat', snr_range=[5, 25], pilot_count=31,
-                            noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
-                            denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
-                            only_train_noise_level=False, fix_noise=True, extra='', dft_chuck=0,
-                            use_dft_padding=True)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod10_nf1, add_var=True, n_f=1, conv=6, channel=64, extra='')
 
     # comb nf=2
-    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_400_l10_11.mat', snr_range=[5, 25], pilot_count=20,
-                            noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
-                            denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
-                            only_train_noise_level=False, fix_noise=True, extra='', dft_chuck=0,
-                            use_dft_padding=True)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod10_nf2, add_var=True, n_f=2, conv=6, channel=64, extra='')
     # comb nf=3
-    train_interpolation_net(data_path='data/spatial_mu_ULA_64_32_64_400_l10_11.mat', snr_range=[5, 25], pilot_count=15,
-                            noise_level_conv=4, noise_channel=32, noise_dnn=(2000, 200, 50), denoising_conv=6,
-                            denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=True,
-                            only_train_noise_level=False, fix_noise=True, extra='', dft_chuck=0,
-                            use_dft_padding=True)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
+                            chuckMethod=chuckMethod10_nf3, add_var=True, n_f=3, conv=6, channel=64, extra='')

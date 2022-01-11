@@ -5,12 +5,14 @@ import scipy.fftpack as sp
 import torch
 
 from config import config
+from loader import CsiDataloader
 from model import CBDNetSFModel
 from utils import DenoisingMethod
 from utils import complex2real, DenoisingMethodLS
 from utils import get_interpolation_idx_nf
-from utils.common import line_interpolation_hp_pilot_sp
-from utils.DftChuckTestMethod import DftChuckMethod, Transform, get_chuck_G
+from utils.common import line_interpolation_hp_pilot_sp, TestMethod
+from utils.DftChuckTestMethod import DftChuckMethod, Transform, get_chuck_G, KSTestMethod, DftChuckFixPathMethod, \
+    DftChuckThresholdMeanMethod
 
 
 class InterpolationMethod(abc.ABC):
@@ -136,7 +138,7 @@ class InterpolationMethodTransformChuck(InterpolationMethodLine):
     def get_pilot_name(self):
         return self.get_key_name()
 
-    def get_H_hat(self, y, H, xp, var, rhh):
+    def get_H_hat_and_var(self, y, H, xp, var, rhh):
         h_p = H[:, self.pilot_idx]
         if self.denoisingMethod is not None:
             y = y[:, self.pilot_idx]
@@ -146,7 +148,7 @@ class InterpolationMethodTransformChuck(InterpolationMethodLine):
         if self.is_denosing:
             self.chuckMethod.n_sc = self.n_sc
             self.chuckMethod.cp = self.cp
-            h_p_in_time, chuck_array = get_chuck_G(h_p, var, self.chuckMethod)
+            h_p_in_time, chuck_array, est_left_var_list = get_chuck_G(h_p, var, self.chuckMethod)
             h_p_in_time = h_p_in_time * chuck_array
             if self.chuckMethod.transform == Transform.dft:
                 H_hat = np.fft.fft(h_p_in_time, axis=-2)
@@ -155,29 +157,64 @@ class InterpolationMethodTransformChuck(InterpolationMethodLine):
         else:
             self.chuckMethod.n_sc = self.pilot_count
             self.chuckMethod.cp = self.cp
-            h_p_in_time, chuck_array = get_chuck_G(h_p, var, self.chuckMethod)
+            h_p_in_time, chuck_array, est_left_var_list = get_chuck_G(h_p, var, self.chuckMethod)
             if self.chuckMethod.transform == Transform.dft:
                 h_p_in_time = h_p_in_time * chuck_array
                 split_idx = self.pilot_count
                 zeros_count = self.n_sc - self.pilot_count
                 H_hat = np.concatenate((h_p_in_time[:, :, :split_idx],
-                                              np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
-                                              h_p_in_time[:, :, split_idx:]), axis=-2)
+                                        np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                        h_p_in_time[:, :, split_idx:]), axis=-2)
+                H_hat = np.fft.fft(H_hat, axis=-2)
+
 
             else:
-                h_p = h_p*self.compensate_before
+                h_p = h_p * self.compensate_before
                 h_p_in_time = sp.idct(h_p, axis=-2, norm='ortho')
-                h_p_in_time = h_p_in_time*chuck_array
+                h_p_in_time = h_p_in_time * chuck_array
                 split_idx = self.pilot_count
                 zeros_count = self.n_sc - self.pilot_count
                 h_p_in_time = np.concatenate((h_p_in_time[:, :, :split_idx],
-                                        np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
-                                        h_p_in_time[:, :, split_idx:]), axis=-2)
+                                              np.zeros((h_p.shape[:2] + (zeros_count, h_p.shape[-1]))),
+                                              h_p_in_time[:, :, split_idx:]), axis=-2)
                 H_hat = sp.dct(h_p_in_time, axis=-2, norm='ortho')
                 H_hat = H_hat * self.compensate_after
         H_hat = torch.from_numpy(H_hat)
         H_hat = H_hat.permute(0, 2, 3, 1)
+        est_left_var_list = torch.from_numpy(est_left_var_list)
+        return H_hat, est_left_var_list
+
+    def get_H_hat(self, y, H, xp, var, rhh):
+        H_hat, est_left_var_list = self.get_H_hat_and_var(y, H, xp, var, rhh)
         return H_hat
+
+
+def get_transformChuckMethod_ks(csi_dataloader: CsiDataloader, transform: Transform, n_f=0, cp=None, extra=''):
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    ks = KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, transform=transform, testMethod=TestMethod.freq_diff)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), ks, extra=extra)
+    return transformChuckMethod
+
+
+def get_transformChuckMethod_fix_path(csi_dataloader: CsiDataloader, transform: Transform, fix_path, n_f=0, cp=None,
+                                      extra=''):
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    fix_method = DftChuckFixPathMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, fix_path, True, transform)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), fix_method, extra=extra)
+    return transformChuckMethod
+
+
+def get_transformChuckMethod_threshold(csi_dataloader: CsiDataloader, transform: Transform, n_f=0, cp=None, extra=''):
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    threshold = DftChuckThresholdMeanMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, transform=transform)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), threshold, extra=extra)
+    return transformChuckMethod
 
 
 class InterpolationMethodChuck(InterpolationMethodLine):

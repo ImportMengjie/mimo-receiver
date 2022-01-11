@@ -220,7 +220,7 @@ def cmp_diff_test_method(csi_loader, dft_chuck_test_list, snr_start, snr_end, sn
 
             for dft_idx in range(len(dft_chuck_test_list)):
                 snr_total_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
-                path_hat, p_list = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat, true_var)
+                path_hat, _ = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat, true_var)
                 if path_hat != get_path_count(i):
                     snr_error_est_count[dft_idx][(snr - snr_start) // snr_step] += 1
                     if path_hat > get_path_count(i):
@@ -320,7 +320,7 @@ def cmp_diff_test_method_nmse(csi_loader, dft_chuck_test_list, snr_start, snr_en
                 put_in_j_h_chuck(cp, -2, Transform.dft)
                 put_in_j_h_chuck(cp, -3, Transform.dct)
                 for dft_idx in range(len(dft_chuck_test_list)):
-                    path_hat, p_list = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat_idct, i_g_hat,
+                    path_hat, _ = dft_chuck_test_list[dft_idx].get_path_count(i_g_hat_idft, i_g_hat_idct, i_g_hat,
                                                                                    true_var)
                     put_in_j_h_chuck(path_hat, dft_idx, dft_chuck_test_list[dft_idx].transform)
 

@@ -22,21 +22,45 @@ class Transform(Enum):
 
 class DftChuckMethod(abc.ABC):
 
-    def __init__(self, n_r, n_sc, cp, min_path, full_name):
+    def __init__(self, n_r, n_sc, cp, min_path, full_name, transform):
         self.n_r = n_r
         self.n_sc = n_sc
         self.cp = cp
         self.min_path = min_path
         self.full_name = full_name
-        self.transform = None
+        self.transform = transform
 
     @abc.abstractmethod
-    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, float):
         pass
 
     @abc.abstractmethod
     def name(self):
         pass
+
+
+class DftChuckFixPathMethod(DftChuckMethod):
+
+    def __init__(self, n_r, n_sc, cp, fix_path: int, full_name, transform):
+        super().__init__(n_r, n_sc, cp, 1, full_name, transform=transform)
+        self.fix_path = fix_path
+
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, float):
+        true_left_var = true_var * (self.n_sc - self.fix_path) / self.n_sc
+        if self.transform == Transform.dft:
+            g_hat_time = g_hat_idft
+        else:
+            g_hat_time = g_hat_idct
+        freq_var = (np.abs(g_hat_time[self.cp:]) ** 2).mean() / 2
+        if self.transform == Transform.dft:
+            freq_var = self.n_sc * freq_var
+
+        est_left_var = (freq_var * (self.n_sc - self.fix_path) / self.n_sc).item()
+
+        return self.fix_path, est_left_var
+
+    def name(self):
+        return 'fix-path-{}-{}'.format(self.fix_path, self.transform.name)
 
 
 class DftChuckThresholdMethod(DftChuckMethod, abc.ABC):
@@ -45,7 +69,7 @@ class DftChuckThresholdMethod(DftChuckMethod, abc.ABC):
         return 'threshold-{}-{}'.format(self.get_threshold_name(), self.transform.name)
 
     def __init__(self, n_r, n_sc, cp, min_path, full_name, transform=Transform.dft):
-        super().__init__(n_r, n_sc, cp, min_path, full_name)
+        super().__init__(n_r, n_sc, cp, min_path, full_name, transform)
         self.transform = transform
 
     @abc.abstractmethod
@@ -56,7 +80,7 @@ class DftChuckThresholdMethod(DftChuckMethod, abc.ABC):
     def get_miu(self, g_hat_time):
         pass
 
-    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, float):
         if self.transform == Transform.dft:
             g_hat_time = g_hat_idft
         else:
@@ -78,9 +102,8 @@ class DftChuckThresholdMeanMethod(DftChuckThresholdMethod):
     def get_miu(self, g_hat_time):
         return (np.abs(g_hat_time[:self.cp]) ** 2).mean()
 
-    def __init__(self, n_r, n_sc, cp, min_path, full_name, transform=Transform.dft):
-        super().__init__(n_r, n_sc, cp, min_path, full_name)
-        self.transform = transform
+    def __init__(self, n_r, n_sc, cp, min_path=2, full_name=False, transform=Transform.dft):
+        super().__init__(n_r, n_sc, cp, min_path, full_name, transform)
 
 
 class DftChuckThresholdVarMethod(DftChuckThresholdMethod):
@@ -103,7 +126,7 @@ class DftChuckTestMethod(DftChuckMethod):
 
     def __init__(self, n_r, n_sc, cp, transform: Transform, a=0.1, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row, full_name=False, min_path=2):
-        super().__init__(n_r, n_sc, cp, min_path, full_name)
+        super().__init__(n_r, n_sc, cp, min_path, full_name, transform)
         self.testMethod = testMethod
         self.a = a
         self.not_cp = n_r - cp
@@ -112,12 +135,15 @@ class DftChuckTestMethod(DftChuckMethod):
         self.update_est_var = False
         self.transform = transform
 
-    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, any):
+    def get_path_count(self, g_hat_idft: np.ndarray, g_hat_idct: np.ndarray, g_hat, true_var) -> (int, float):
         if self.transform == Transform.dft:
             g_hat_time = g_hat_idft
         else:
             g_hat_time = g_hat_idct
         probability_list = []
+        freq_var = (np.abs(g_hat_time[self.cp:]) ** 2).mean() / 2
+        if self.transform == Transform.dft:
+            freq_var = self.n_sc * freq_var
         if self.testMethod == TestMethod.one_row:
             g_hat_time = np.concatenate((g_hat_time.real, g_hat_time.imag), axis=1)
             est_var = (g_hat_time[self.cp:] ** 2).mean()
@@ -130,7 +156,7 @@ class DftChuckTestMethod(DftChuckMethod):
                 is_path, probability = self.test_one_row(time_row, est_var, true_var, i, g_hat_time)
                 probability_list.append(probability)
                 if is_path:
-                    return i + 1, probability_list
+                    return i + 1, probability_list, (freq_var * (self.n_sc - i + 1) / self.n_sc).item()
         elif self.testMethod == TestMethod.whole_noise:
             g_hat_time = np.concatenate((g_hat_time.real, g_hat_time.imag), axis=1)
             est_var = (g_hat_time[self.cp:] ** 2).mean()
@@ -143,7 +169,7 @@ class DftChuckTestMethod(DftChuckMethod):
                 is_path, probability = self.test_whole_noise(time_rows, est_var, true_var, i, g_hat_time)
                 probability_list.append(probability)
                 if is_path:
-                    return i + 1, probability_list
+                    return i + 1, probability_list, (freq_var * (self.n_sc - i + 1) / self.n_sc).item()
         elif self.testMethod == TestMethod.freq_diff:
             chuck_array = np.concatenate((np.ones(self.cp), np.zeros(self.n_sc - self.cp))).reshape((-1, 1))
             est_cp_var = (np.abs(g_hat_time[self.cp:]) ** 2).mean()
@@ -168,11 +194,11 @@ class DftChuckTestMethod(DftChuckMethod):
                 is_path, probability = self.test_dft_diff(dft_diff, est_var, true_var, i, g_chuck)
                 probability_list.append(probability)
                 if is_path:
-                    return i + 1, probability_list
+                    return i + 1, (freq_var * (self.n_sc - i - 1) / self.n_sc).item()
         if self.first:
             logging.warning('get zero path in {}'.format(self.name()))
             self.first = False
-        return self.min_path, probability_list
+        return self.min_path, (freq_var * (self.n_sc - self.min_path) / self.n_sc).item()
 
     @abc.abstractmethod
     def test_one_row(self, idft_row: np.ndarray, est_var, true_var, i, idft_g) -> (bool, any):
@@ -303,7 +329,7 @@ class KSTestMethod(DftChuckTestMethod):
         _, p = scipy.stats.kstest(dft_diff.flatten(), 'norm', (0, var ** 0.5))
         return p <= self.a, p
 
-    def __init__(self, n_r, n_sc, cp, two_samp=True, a=0.1, use_true_var=False,
+    def __init__(self, n_r, n_sc, cp, two_samp=True, a=0.02, use_true_var=False,
                  testMethod: TestMethod = TestMethod.one_row,
                  full_name=False, transform: Transform = Transform.dft):
         super().__init__(n_r, n_sc, cp, transform, a=a, use_true_var=use_true_var, testMethod=testMethod,
@@ -312,6 +338,8 @@ class KSTestMethod(DftChuckTestMethod):
 
     def name(self):
         n = 'ks-test-{}-{}'.format(self.testMethod.name, self.transform.name)
+        if self.full_name:
+            n += '-{}'.format(self.a)
         # if self.testMethod == TestMethod.one_row:
         #     n += '-ts{}'.format(self.two_samp)
         return n
@@ -374,20 +402,22 @@ def get_chuck_G(G: np.ndarray, true_var_complex, chuckMethod: DftChuckMethod):
     :return: G_in_time
     """
     J, N_t, K, N_r = G.shape
-    logging.info('get chuck path j={},N_t={},K={},N_r={}, chuckMethod={}'.format(J, N_t, K, N_r, chuckMethod.name()))
+    logging.info('get chuck path j={},N_t={},K={},N_r={},cp={}, chuckMethod={}'.format(J, N_t, K, N_r, chuckMethod.cp,
+                                                                                       chuckMethod.name()))
     if chuckMethod.transform == Transform.dft:
         G_in_time = np.fft.ifft(G, axis=-2)
     else:
         G_in_time = sp.idct(G, axis=-2, norm='ortho')
 
     total_chuck_array = None
+    est_left_var_list = []
     for j in range(J):
         chuck_array_n_r = None
         for n_t in range(N_t):
             g_in_time = G_in_time[j, n_t]
             true_var = true_var_complex[j, 0, 0].item() / 2
-            path_hat, _ = chuckMethod.get_path_count(g_in_time, g_in_time, G[j, n_t], true_var)
-
+            path_hat, est_left_var = chuckMethod.get_path_count(g_in_time, g_in_time, G[j, n_t], true_var)
+            est_left_var_list.append(est_left_var)
             chuck_array = np.concatenate((np.ones(path_hat), np.zeros(K - path_hat))).reshape(
                 (1, 1, -1, 1))
             if chuck_array_n_r is None:
@@ -399,4 +429,5 @@ def get_chuck_G(G: np.ndarray, true_var_complex, chuckMethod: DftChuckMethod):
         else:
             total_chuck_array = np.concatenate((total_chuck_array, chuck_array_n_r), axis=0)
     logging.info('done chuck path j={},N_t={},K={},N_r={}, chuckMethod={}'.format(J, N_t, K, N_r, chuckMethod.name()))
-    return G_in_time, total_chuck_array
+    est_left_var_list = np.array(est_left_var_list).reshape((J, N_t, 1, 1))
+    return G_in_time, total_chuck_array, est_left_var_list

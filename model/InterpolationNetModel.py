@@ -48,80 +48,49 @@ class NoiseLevelModel(nn.Module):
 
 class NonBlindDenoisingModel(nn.Module):
 
-    def __init__(self, conv_num, channel_num, kernel_size, use_2dim):
+    def __init__(self, conv_num, channel_num, kernel_size, add_var):
         super().__init__()
         self.conv_num = conv_num
         self.channel_num = channel_num
         self.kernel_size = kernel_size
-        self.use_2dim = use_2dim
+        self.add_var = add_var
+        use_2dim = True
         padding = ((kernel_size[0] - 1) // 2, (kernel_size[1] - 1) // 2 if use_2dim else 0)
-        self.first_conv = ConvReluBlock(3 if use_2dim else 2, channel_num, kernel_size, padding, use_2dim)
+        self.first_conv = ConvReluBlock(3 if add_var else 2, channel_num, kernel_size, padding, use_2dim)
         self.conv_bn_relu_seq = [ConvBnReluBlock(channel_num, channel_num, kernel_size, padding, use_2dim) for _ in
                                  range(conv_num)]
         self.conv_bn_relu_seq = nn.Sequential(*self.conv_bn_relu_seq)
-        self.back_conv = nn.Conv2d(self.channel_num, 2 if use_2dim else 1, kernel_size, padding=padding)
+        self.back_conv = nn.Conv2d(self.channel_num, 2, kernel_size, padding=padding)
 
     def forward(self, x):
         x = self.first_conv(x)
         x = self.conv_bn_relu_seq(x)
-        out = self.back_conv(Padding(self.kernel_size, self.use_2dim)(x))
+        out = self.back_conv(Padding(self.kernel_size, True)(x))
         return out
 
 
 class CBDNetSFModel(BaseNetModel):
 
-    def __init__(self, csiDataloader: CsiDataloader, pilot_count, noise_level_conv=4, noise_channel=32,
-                 noise_dnn=(2000, 200, 50),
-                 denoising_conv=6, denoising_channel=64, kernel_size=(3, 3), use_two_dim=True, use_true_sigma=False,
-                 only_return_noise_level=False, extra='', dft_chuck=0, use_dft_padding=False):
+    def __init__(self, csiDataloader: CsiDataloader, chuck_name, add_var, n_f=0, conv=6, channel=64, kernel_size=(3, 3),
+                 extra=''):
         super().__init__(csiDataloader)
-        assert not (dft_chuck > 0 and use_dft_padding)
-
-        self.pilot_idx = get_interpolation_pilot_idx(csiDataloader.n_sc, pilot_count)
-        self.pilot_count = torch.sum(self.pilot_idx).item()
-        self.noise_level_conv = noise_level_conv
-        self.noise_channel = noise_channel
-        self.noise_dnn = noise_dnn
-        self.denoising_conv = denoising_conv
-        self.denoising_channel = denoising_channel
+        self.conv = conv
+        self.channel = channel
         self.kernel_size = kernel_size
-        self.use_two_dim = use_two_dim
-        self.use_true_sigma = use_true_sigma
-        self.only_return_noise_level = only_return_noise_level
         self.extra = extra
-        self.noise_level = NoiseLevelModel(self.n_sc, self.n_r, noise_level_conv, noise_channel, noise_dnn, kernel_size,
-                                           use_two_dim)
-        self.denoising = NonBlindDenoisingModel(denoising_conv, denoising_channel, kernel_size, use_two_dim)
-        self.dft_chuck = dft_chuck
-        self.use_dft_padding = use_dft_padding
-        if self.dft_chuck > 0:
-            self.chuck_array = np.concatenate((np.ones(self.dft_chuck), np.zeros(self.n_sc - self.dft_chuck)))
-            self.chuck_array = self.chuck_array.reshape((-1, 1))
-
+        self.denoising = NonBlindDenoisingModel(conv, channel, kernel_size, add_var)
+        self.add_var = add_var
+        self.chuck_name = chuck_name
+        self.n_f = n_f
         self.name = self.__str__()
 
     def set_path(self, path):
-        assert path <= self.n_sc
-        if self.dft_chuck > 0:
-            self.chuck_array = np.concatenate((np.ones(path), np.zeros(self.n_sc - path)))
-            self.chuck_array = self.chuck_array.reshape((-1, 1))
-            self.dft_chuck = path
+        pass
 
     def __str__(self):
-        name = '{}-{}_r{}t{}K{}p{}_cn{}-{}ch{}-{}dn{}k{}-{}_2dim{}_{}'.format(self.get_dataset_name(),
-                                                                              self.__class__.__name__, self.n_r,
-                                                                              self.n_t, self.n_sc, self.pilot_count,
-                                                                              self.denoising_conv,
-                                                                              self.noise_level_conv,
-                                                                              self.denoising_channel,
-                                                                              self.noise_channel,
-                                                                              '-'.join(map(str, self.noise_dnn)),
-                                                                              self.kernel_size[0], self.kernel_size[1],
-                                                                              self.use_two_dim, self.extra)
-        if self.dft_chuck > 0:
-            name += '_chuck{}'.format(self.dft_chuck)
-        if self.use_dft_padding:
-            name += '_dft_padding'
+        name = '{}-{}_{}_r{}t{}K{}n_f{}_cv{}-ch{}-var{}-{}'.format(self.get_dataset_name(), self.chuck_name,
+                                                                self.__class__.__name__, self.n_r, self.n_t, self.n_sc,
+                                                                self.n_f, self.conv, self.channel, self.add_var,self.extra)
         return name
 
     def basename(self):
@@ -136,56 +105,16 @@ class CBDNetSFModel(BaseNetModel):
         :param var: batch,1
         :return:
         """
-        if self.use_dft_padding:
-            x = x.cpu().numpy()
-            x = x[:, self.pilot_idx]
-            x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
-            x = np.fft.ifft(x, axis=-2)
-            x = np.concatenate((x, np.zeros(x.shape[:1] + (self.n_sc - self.pilot_count, x.shape[-1]))), axis=-2)
-            x = np.fft.fft(x, axis=-2)
-            x = torch.from_numpy(x)
-            x = complex2real(x)
-            if config.USE_GPU:
-                x = x.cuda()
-        if self.dft_chuck > 0:
-            x = x.cpu().numpy()
-            x = x[:, :, :, 0] + x[:, :, :, 1] * 1j
-            x = np.fft.ifft2(x)
-            x = x * self.chuck_array
-            x = np.fft.fft2(x)
-            x = torch.from_numpy(x)
-            x = complex2real(x)
-            if config.USE_GPU:
-                x = x.cuda()
-        if not self.use_two_dim:
-            x = torch.cat((x[:, :, :, 0], x[:, :, :, 1]), -1).unsqueeze(1)
-            sigma = (var / 2) ** 0.5
+        x = x.permute(0, 3, 1, 2)
+        var = var.reshape((-1, 1, 1, 1)).repeat(1, 1, self.n_sc, self.n_r)
+        if self.add_var:
+            concat_x = torch.cat([x, var], dim=1)
         else:
-            x = x.permute(0, 3, 1, 2)
-            sigma = var ** 0.5
-        if not self.use_true_sigma:
-            sigma = self.noise_level(x)
-
-        assert sigma.shape[1] == 1
-        if self.only_return_noise_level:
-            return None, sigma
-        if self.use_two_dim:
-            sigma_map = sigma.unsqueeze(-1).repeat(1, self.n_sc, self.n_r).unsqueeze(1)
-        else:
-            sigma_map = sigma.unsqueeze(-1).repeat(1, self.n_sc, 2 * self.n_r).unsqueeze(1)
-        concat_x = torch.cat([x, sigma_map], dim=1)
+            concat_x = x
         noise = self.denoising(concat_x)
-        h_hat = (x - noise)
-        if not self.use_two_dim:
-            h_hat = h_hat.squeeze().unsqueeze(-1)
-            h_hat = torch.cat((h_hat[:, :, :h_hat.shape[-2] // 2, :], h_hat[:, :, h_hat.shape[-2] // 2:, :]), -1)
-        else:
-            h_hat = h_hat.permute(0, 2, 3, 1)
-        if self.use_two_dim:
-            var_hat = sigma ** 2
-        else:
-            var_hat = 2 * (sigma ** 2)
-        return h_hat, var_hat.squeeze()
+        g_hat = (x - noise)
+        g_hat = g_hat.permute(0, 2, 3, 1)
+        return g_hat,
 
 
 class InterpolationNetModel(BaseNetModel):
@@ -229,27 +158,11 @@ class InterpolationNetModel(BaseNetModel):
 
 class InterpolationNetLoss(nn.Module):
 
-    def __init__(self, only_train_noise_level, use2dim):
+    def __init__(self,):
         super(InterpolationNetLoss, self).__init__()
-        self.only_train_noise_level = only_train_noise_level
-        self.use2dim = use2dim
 
-    def forward(self, h, h_hat, var, var_hat):
-        if self.use2dim:
-            sigma = var ** 0.5
-            sigma_hat = var_hat ** 0.5
-        else:
-            sigma = (var / 2) ** 0.5
-            sigma_hat = (var_hat / 2) ** 0.5
-
-        if self.only_train_noise_level:
-            loss = ((sigma - sigma_hat) ** 2).mean()
-        else:
-            sigma = sigma.squeeze()
-            sigma_hat = sigma_hat.squeeze()
-            l2_sigma_loss = F.mse_loss(sigma, sigma_hat)
-            l2_h_loss = F.mse_loss(h_hat, h)
-            loss = l2_h_loss + l2_sigma_loss
+    def forward(self, g, g_hat):
+        loss = F.mse_loss(g_hat, g)
         return loss
 
 
@@ -264,7 +177,7 @@ class InterpolationNetTee(Tee):
         return self.h, self.var
 
     def set_model_output(self, outputs):
-        self.h_hat, self.var_hat = outputs
+        self.h_hat, = outputs
 
     def get_loss_input(self):
-        return self.H, self.h_hat, self.var, self.var_hat
+        return self.H, self.h_hat,
