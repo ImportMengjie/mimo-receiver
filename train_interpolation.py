@@ -40,7 +40,7 @@ def train_interpolation_net(csi_dataloader:CsiDataloader, snr_range: list, chuck
     criterion = InterpolationNetLoss()
     param = TrainParam()
     param.stop_when_test_loss_down_epoch_count = 5
-    param.epochs = 50
+    param.epochs = 10
     param.lr = 0.001
     param.batch_size = 100
     param.log_loss_per_epochs = 1

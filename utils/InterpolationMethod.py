@@ -352,17 +352,46 @@ class InterpolationMethodDct(InterpolationMethodLine):
         return H_hat
 
 
+def get_modelMethod_ks(csi_dataloader: CsiDataloader, transform: Transform, add_var=True, n_f=0,
+                       conv=6, channel=64, kernel_size=(3, 3), cp=None, extra=''):
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    ks = KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, transform=transform, testMethod=TestMethod.freq_diff)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), ks, )
+    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
+                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+    return modelMethod
+
+
+def get_modelMethod_fix_path(csi_dataloader: CsiDataloader, transform: Transform, fix_path, add_var=True, n_f=0,
+                             conv=6, channel=64, kernel_size=(3, 3), cp=None, extra=''):
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    fix_method = DftChuckFixPathMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, fix_path, True, transform)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), fix_method, extra=extra)
+    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
+                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+    return modelMethod
+
+
 class InterpolationMethodModel(InterpolationMethodLine):
 
-    def __init__(self, model: CBDNetSFModel, use_gpu, n_f=None, extra='') -> None:
+    def __init__(self, csi_dataloader: CsiDataloader, chuckMethod: InterpolationMethodTransformChuck, add_var, n_f=0,
+                 conv=6, channel=64, kernel_size=(3, 3), extra='') -> None:
+        from train import load_model_from_file
         denoisingMethod = DenoisingMethodLS()
-        if n_f is None:
-            n_f = model.pilot_count
-        super().__init__(model.n_sc, n_f, 'linear', denoisingMethod, False, extra)
-        self.model = model.double().eval()
-        self.use_gpu = use_gpu
-        if self.use_gpu:
-            self.model = model.cuda()
+        self.chuckMethod = chuckMethod
+        self.use_gpu = config.USE_GPU
+        self.model = CBDNetSFModel(csiDataloader=csi_dataloader, chuck_name=chuckMethod.get_key_name(), add_var=add_var,
+                                   n_f=n_f,
+                                   conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+        self.model = load_model_from_file(self.model, config.USE_GPU)
+        super().__init__(self.model.n_sc, n_f, 'linear', denoisingMethod, False, extra)
+        self.model = self.model.double().eval()
+        if config.USE_GPU:
+            self.model = self.model.cuda()
 
     def get_key_name(self):
         return self.model.name + self.extra
@@ -372,23 +401,18 @@ class InterpolationMethodModel(InterpolationMethodLine):
 
     def get_H_hat(self, y, H, xp, var, rhh):
         J, n_sc, n_r, n_t = H.shape
-        h_p = H[:, self.pilot_idx]
-        if self.denoisingMethod is not None:
-            y = y[:, self.pilot_idx]
-            h_p = self.denoisingMethod.get_h_hat(y, h_p, xp, var, rhh)
-        H_hat = line_interpolation_hp_pilot_sp(h_p, self.pilot_idx, self.n_sc)
+        H_hat, est_left_var_list = self.chuckMethod.get_H_hat_and_var(y, H, xp, var, rhh)
         H_hat = H_hat.permute(0, 3, 1, 2)
         H_hat = complex2real(H_hat.reshape((-1,) + H_hat.shape[-2:]))
-        var = var.repeat((1, 1, 1, n_t)).reshape(-1, 1)
+        est_left_var_list = est_left_var_list.reshape(-1, 1)
         model_H_hat = None
         for i in range(0, H_hat.shape[0], config.ANALYSIS_BATCH_SIZE):
             H_hat_batch = H_hat[i:i + config.ANALYSIS_BATCH_SIZE]
-            var_batch = var[i: i + config.ANALYSIS_BATCH_SIZE]
-
+            est_var_batch = est_left_var_list[i: i + config.ANALYSIS_BATCH_SIZE]
             if self.use_gpu:
                 H_hat_batch = H_hat_batch.cuda()
-                var_batch = var_batch.cuda()
-            model_H_hat_batch, _ = self.model(H_hat_batch, var_batch)
+                est_var_batch = est_var_batch.cuda()
+            model_H_hat_batch, = self.model(H_hat_batch, est_var_batch)
             if model_H_hat_batch.is_cuda:
                 model_H_hat_batch = model_H_hat_batch.detach().cpu()
             if model_H_hat is None:
