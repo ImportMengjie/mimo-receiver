@@ -115,6 +115,108 @@ class DetectionNetModel(BaseNetModel):
         return 'train layer:{}/{},fix forward:{}'.format(self.training_layer, self.layer_nums, self.fix_forward_layer)
 
 
+class DetNet(nn.Module):
+
+    def __init__(self, n_t: int):
+        super().__init__()
+        self.delta1k = nn.Parameter(torch.Tensor(1, ))
+        self.delta2k = nn.Parameter(torch.Tensor(1, ))
+        self.tk = nn.Parameter(torch.Tensor(1, ))
+
+        self.w1k = nn.Parameter(torch.Tensor(4 * n_t, 4 * n_t))
+        self.b1k = nn.Parameter(torch.Tensor(4 * n_t, 1))
+        self.w2k = nn.Parameter(torch.Tensor(4 * n_t, 4 * n_t))
+        self.b2k = nn.Parameter(torch.Tensor(2 * n_t, 1))
+        self.w3k = nn.Parameter(torch.Tensor(2 * n_t, 4 * n_t))
+        self.b3k = nn.Parameter(torch.Tensor(2 * n_t, 1))
+        self.a = 0.75
+
+    def forward(self, A, b, x, v):
+        q = x - self.delta1k * b + self.delta2k * A @ b
+        z = nn.ReLU(self.w1k @ torch.cat([q, v], -2) + self.b1k)
+        x_next = self.w2k @ z + self.b2k
+        x_next = -1 + (nn.ReLU(x_next + self.tk) / torch.abs(self.tk)) - (
+                nn.ReLU(x_next - self.tk) / torch.abs(self.tk))
+        v_next = self.w3k @ z + self.b3k
+        return x_next * self.a + (1 - self.a) * x, v_next
+
+
+class DetectionDetNet(BaseNetModel):
+
+    def __init__(self, csiDataloader: CsiDataloader, layers: int = 30):
+        super().__init__(csiDataloader)
+        self.layers = layers
+        self.det_layers = [DetNet(csiDataloader.n_t) for _ in range(self.layers)]
+        self.det_layers = nn.ModuleList(self.det_layers)
+
+    def forward(self, A, b):
+        s = torch.zeros(b.shape)
+        v = torch.zeros(b.shape)
+        if config.USE_GPU:
+            s = s.cuda()
+            v = v.cuda()
+        for i in range(self.layers):
+            s, v = self.det_layers[i](A, b, s, v)
+        return s, None
+
+    def __str__(self):
+        return '{}-{}_r{}t{}_l{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
+                                         self.layers)
+
+    def basename(self):
+        return 'detection'
+
+    def get_train_state_str(self):
+        return ''
+
+
+class SampNet(nn.Module):
+
+    def __init__(self, n_r, n_t):
+        super().__init__()
+        self.lambada = nn.Parameter(torch.Tensor(1, ))
+        self.beta = n_t / n_r
+        self.n_t = n_t
+        self.n_r = n_r
+
+    def forward(self, y, h, r, e, a, sigma):
+        x = 1 / self.n_r * torch.eye(self.n_t, self.n_t) @ y
+        x = e * (torch.transpose(h, -1, -2) @ r + x)
+        r = y - h @ x + self.beta * e @ r
+        a = sigma ** 2 + self.lambada * self.beta * e * a
+        e = 1 / (1 + a)
+
+        return x, r, e, a
+
+
+class SampNetModel(BaseNetModel):
+
+    def __init__(self, csiDataloader: CsiDataloader, layers: int = 5):
+        super().__init__(csiDataloader)
+        self.layers = layers
+        self.samp_layers = [SampNetModel(csiDataloader.n_r, csiDataloader.n_t) for _ in range(self.layers)]
+        self.samp_layers = nn.ModuleList(self.samp_layers)
+
+    def forward(self, y, h, sigma):
+        a = sigma
+        x = None
+        r = y
+        e = 1 / (1 + a)
+        for i in range(self.layers):
+            x, r, e, a = self.samp_layers[i](y, h, r, e, a, sigma)
+        return x,
+
+    def __str__(self):
+        return '{}-{}_r{}t{}_l{}'.format(self.get_dataset_name(), self.__class__.__name__, self.n_r, self.n_t,
+                                         self.layers)
+
+    def basename(self):
+        return 'detection'
+
+    def get_train_state_str(self):
+        return ''
+
+
 class DetectionNetLoss(nn.Module):
 
     def __init__(self, use_layer_total_mse=False):

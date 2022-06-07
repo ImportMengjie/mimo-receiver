@@ -109,17 +109,9 @@ class DetectionMethodModel(DetectionMethod):
         return x_hat
 
 
-class DetectionMethodML(DetectionMethod):
-    def get_key_name(self):
-        return 'ml'
-
-    def get_x_hat(self, y, h, x, var):
-        pass
-
-
 class DetectionMethodSD(DetectionMethod):
 
-    def sphereDecoding(m, n, H, variance, QAM=4):
+    def sphereDecoding(self, m, n, H, variance, QAM=4):
         INF = 1000111000111
         alpha = 2
         v = np.random.normal(0, np.sqrt(variance), (n, 1))
@@ -212,7 +204,8 @@ class DetectionMethodSD(DetectionMethod):
         return 'SD'
 
     def get_x_hat(self, y, h, x, var):
-        pass
+        m, n = h.shape[:-2]
+        return self.sphereDecoding(m, n, h, var, QAM=4)
 
 
 class DetectionMethodConjugateGradient(DetectionMethod):
