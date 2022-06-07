@@ -2,7 +2,7 @@ from loader import InterpolationNetDataset
 from model import CBDNetSFModel, InterpolationNetLoss, InterpolationNetTee
 from train import *
 from utils import InterpolationMethodTransformChuck, Transform
-from utils.InterpolationMethod import get_transformChuckMethod_fix_path
+from utils.InterpolationMethod import get_transformChuckMethod_fix_path, get_transformChuckMethod_ks
 
 
 def loss_nmse_func(train: Train):
@@ -86,3 +86,17 @@ if __name__ == '__main__':
     # comb nf=3
     train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5, 25],
                             chuckMethod=chuckMethod10_nf3, add_var=True, n_f=3, conv=6, channel=64, extra='')
+
+    from utils.InterpolationMethod import get_transformChuckMethod_ks
+
+    csi_dataloader = CsiDataloader('data/imt_2020_64_32_512_100.mat', train_data_radio=0.9)
+    cp = csi_dataloader.n_sc//4
+
+    ks_method_nf0 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dct, fix_path=cp, n_f=0, cp=cp)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5,20], chuckMethod=ks_method_nf0, add_var=True)
+    # ks_method_nf1 = get_transformChuckMethod_ks(csi_dataloader, Transform.dct, n_f=1, cp=cp)
+    ks_method_nf1 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dct, fix_path=cp, n_f=1, cp=cp)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5,20], chuckMethod=ks_method_nf1, add_var=True)
+    # ks_method_nf2 = get_transformChuckMethod_ks(csi_dataloader, Transform.dct, n_f=2, cp=cp)
+    ks_method_nf2 = get_transformChuckMethod_fix_path(csi_dataloader, Transform.dct, fix_path=cp, n_f=2, cp=cp)
+    train_interpolation_net(csi_dataloader=csi_dataloader, snr_range=[5,20], chuckMethod=ks_method_nf2, add_var=True)

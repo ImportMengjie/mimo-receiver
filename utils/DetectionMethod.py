@@ -41,7 +41,7 @@ class DetectionMethod(abc.ABC):
 
         x_hat_dist = (x_hat_r - constellation_r) ** 2 + (x_hat_i - constellation_i) ** 2
         x_hat_idx = torch.argmin(x_hat_dist, dim=-1, keepdim=True)
-        ber = (x_hat_idx != x_idx).sum() / x_idx.numel()
+        ber = (x_hat_idx != x_idx).sum().double() / x_idx.numel()
         return ber.item()
 
 

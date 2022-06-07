@@ -123,17 +123,20 @@ def analysis_detection_layer(csi_dataloader: CsiDataloader, model_list: [Detecti
 
 def cmp_base_model_nmse_ber(csi_dataloader: CsiDataloader, snr_start, snr_end, snr_step, modulation, layer, svm,
                             extra='', show_name=None):
-    model = DetectionNetModel(csi_dataloader, layer_nums=layer, svm=svm, is_training=False,
+    model_v = DetectionNetModel(csi_dataloader, layer_nums=layer, svm='v', is_training=False,
                               modulation=modulation, extra=extra)
-    model = load_model_from_file(model, use_gpu)
+    model_v = load_model_from_file(model_v, use_gpu)
+    model_s = DetectionNetModel(csi_dataloader, layer_nums=layer, svm='s', is_training=False,
+                                modulation=modulation, extra=extra)
+    model_s = load_model_from_file(model_s, use_gpu)
     if show_name is not None:
-        model.name = show_name
-    detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),]
-                         # DetectionMethodModel(model, modulation, use_gpu)]
-    nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
-                                           modulation=modulation)
-    draw_line(x, nmse_dict, title='detection-{}-{}-nmse'.format(modulation, csi_dataloader.__str__()),
-              save_dir=config.DETECTION_RESULT_IMG)
+        model_v.name = show_name
+    detection_methods = [DetectionMethodZF(modulation), DetectionMethodMMSE(modulation),
+                         DetectionMethodModel(model_v, modulation, use_gpu), DetectionMethodModel(model_s, modulation, use_gpu)]
+    # nmse_dict, x = analysis_detection_nmse(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
+    #                                        modulation=modulation)
+    # draw_line(x, nmse_dict, title='detection-{}-{}-nmse'.format(modulation, csi_dataloader.__str__()),
+    #           save_dir=config.DETECTION_RESULT_IMG)
 
     ber_dict, x = analysis_detection_ber(csi_dataloader, detection_methods, snr_start, snr_end, snr_step,
                                          modulation=modulation)
@@ -229,13 +232,13 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=20, format='%(asctime)s-%(levelname)s-%(message)s')
 
-    csi_dataloader = CsiDataloader('data/imt_2020_64_32_64_400.mat', train_data_radio=0.99, factor=1)
+    csi_dataloader = CsiDataloader('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', train_data_radio=0.0, factor=2)
     # csi_dataloader.__str__ = lambda :'spatial_mu_ULA'
     # cmp_model_runtime('data/spatial_mu_ULA_64_32_64_100_l10_11.mat', 'bpsk', 32, 15, 10, 1000, 'DL-CG-Vector', 'DL-CG-Scalar',
     #                   extra='')
     # cmp_diff_layers_nmse_not_train(csi_dataloader, fix_snr=15, layer_step=2, modulation='qpsk', layer=32, svm='v',
     #                               extra='', show_name='lcg-net')
-    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=0, snr_end=20, snr_step=1, modulation='bpsk',
+    cmp_base_model_nmse_ber(csi_dataloader=csi_dataloader, snr_start=0, snr_end=30, snr_step=2, modulation='qpsk',
                             layer=32, svm='v', extra='', show_name='lcg-net')
     # cmp_diff_layers_nmse(csi_dataloader=csi_dataloader, load_data_from_files=True, fix_snr=15, max_layers=32,
     #                      modulation='bpsk', layer=32, svm='v', extra='')

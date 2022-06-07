@@ -7,7 +7,19 @@ import json
 plt.rcParams['axes.unicode_minus'] = False
 plt.rcParams['font.sans-serif'] = 'Times New Roman'
 
-line_style_list = ['-', '--', '-.', ':'][::-1]
+line_style_list = ['-','--', '-.', ':',][::-1]
+
+line_style_list= [
+     (0, (1, 1)),
+
+     (0, (5, 10)),
+     (0, (5, 5)),
+     (0, (5, 1)),
+
+     (0, (3, 5, 1, 5)),
+     (0, (3, 1, 1, 1)),
+
+     (0, (3, 1, 1, 1, 1, 1))]
 
 """
 's' : 方块状
@@ -24,7 +36,7 @@ line_style_list = ['-', '--', '-.', ':'][::-1]
 markers = ['^', 'v', '+', '*', 'o', 's', 'x', 'p', '1', '2']
 
 
-def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save_path=None,show=True, xlabel='snr(db)',
+def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save_path=None, show=True, xlabel='snr(db)',
               ylabel='nmse(db)', diff_line_style=True, diff_line_markers=False):
     if filter_func is None:
         filter_func = lambda n: True
@@ -32,14 +44,16 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save
     for name, y in y_dict.items():
         y = list(map(lambda n: n if filter_func(n) else None, y))
         marker = markers[i % len(markers)] if diff_line_markers else None
-        plt.plot(x, y, label=name, lw=2, ls=line_style_list[i % len(line_style_list)], marker=marker, mfc='none')
+        plt.plot(x, y[:len(x)], label=name, lw=2, ls=line_style_list[i % len(line_style_list)], marker=marker, mfc='none')
         if diff_line_style:
             i += 1
     if title:
         plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
+    plt.ylim(ymin=1/12800, ymax=0.3)
     plt.legend()
+    plt.yscale('log')
     save_name = (title if title else '') + '-'.join(y_dict.keys())
     save_name = save_name.replace('/', '|')
     save_name_img = save_name + '.png'
@@ -49,7 +63,7 @@ def draw_line(x, y_dict: dict, title=None, filter_func=None, save_dir=None, save
             if not isinstance(y_dict[k], list):
                 y_dict[k] = y_dict[k].tolist()
             for i in range(len(y_dict[k])):
-                if not isinstance(y_dict[k][i], (int, float, )):
+                if not isinstance(y_dict[k][i], (int, float,)):
                     y_dict[k][i] = y_dict[k][i].item()
 
         data_json = {

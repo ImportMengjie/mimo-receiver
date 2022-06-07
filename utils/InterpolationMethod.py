@@ -352,30 +352,6 @@ class InterpolationMethodDct(InterpolationMethodLine):
         return H_hat
 
 
-def get_modelMethod_ks(csi_dataloader: CsiDataloader, transform: Transform, add_var=True, n_f=0,
-                       conv=6, channel=64, kernel_size=(3, 3), cp=None, extra=''):
-    if cp is None:
-        cp = csi_dataloader.n_sc // 4
-    ks = KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, transform=transform, testMethod=TestMethod.freq_diff)
-    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
-                                                             DenoisingMethodLS(), ks, )
-    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
-                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
-    return modelMethod
-
-
-def get_modelMethod_fix_path(csi_dataloader: CsiDataloader, transform: Transform, fix_path, add_var=True, n_f=0,
-                             conv=6, channel=64, kernel_size=(3, 3), cp=None, extra=''):
-    if cp is None:
-        cp = csi_dataloader.n_sc // 4
-    fix_method = DftChuckFixPathMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, fix_path, True, transform)
-    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
-                                                             DenoisingMethodLS(), fix_method, extra=extra)
-    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
-                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
-    return modelMethod
-
-
 class InterpolationMethodModel(InterpolationMethodLine):
 
     def __init__(self, csi_dataloader: CsiDataloader, chuckMethod: InterpolationMethodTransformChuck, add_var, n_f=0,
@@ -447,3 +423,28 @@ class InterpolationMethodModel(InterpolationMethodLine):
                 var_hat = var_hat.cpu()
             sigma_list.extend([s.item() ** 0.5 for s in var_hat.flatten()])
         return sigma_list
+
+
+def get_modelMethod_ks(csi_dataloader: CsiDataloader, transform: Transform, add_var=True, n_f=0,
+                       conv=6, channel=64, kernel_size=(3, 3), cp=None, extra='') -> InterpolationMethodModel:
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    ks = KSTestMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, transform=transform, testMethod=TestMethod.freq_diff)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), ks, )
+    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
+                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+    return modelMethod
+
+
+def get_modelMethod_fix_path(csi_dataloader: CsiDataloader, transform: Transform, fix_path, add_var=True, n_f=0,
+                             conv=6, channel=64, kernel_size=(3, 3), cp=None, extra='') -> InterpolationMethodModel:
+    if cp is None:
+        cp = csi_dataloader.n_sc // 4
+    fix_method = DftChuckFixPathMethod(csi_dataloader.n_r, csi_dataloader.n_sc, cp, fix_path, True, transform)
+    transformChuckMethod = InterpolationMethodTransformChuck(csi_dataloader.n_sc, n_f, transform, cp, None,
+                                                             DenoisingMethodLS(), fix_method, extra=extra)
+    modelMethod = InterpolationMethodModel(csi_dataloader, chuckMethod=transformChuckMethod, add_var=add_var, n_f=n_f,
+                                           conv=conv, channel=channel, kernel_size=kernel_size, extra=extra)
+    modelMethod.model.name = transformChuckMethod.get_key_name()
+    return modelMethod

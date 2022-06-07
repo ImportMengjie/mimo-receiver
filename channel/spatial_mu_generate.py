@@ -52,7 +52,7 @@ if __name__ == '__main__':
     K = 64
     N_r = 8, 8
     N_t = 32
-    L_range = (5, 11)
+    L_range = (20, 21)
     low_freq = 2.4e9
     sc_band = 2e4
     arrayant = Arrayant.ULA
